@@ -32,7 +32,7 @@ const readLimiter = rateLimit({
   message: { ok: false, error: 'Too many requests, please try again later.' },
 });
 
-app.use('/api/', readLimiter);
+app.use('/api/', (req, res, next) => req.method === 'GET' ? readLimiter(req, res, next) : next());
 
 // Security headers
 app.use((req, res, next) => {
@@ -169,6 +169,9 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
     res.status(502).json({ ok: false, error: err.message });
   }
 });
+
+// 404 for undefined /api/* routes – must come before SPA catch-all
+app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

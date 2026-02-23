@@ -1,7 +1,10 @@
 /* Gluetun Web UI - app.js */
 
 const MAX_HISTORY = 30;
-const statusHistory = [];
+const SESSION_KEY = 'gluetun_history';
+const statusHistory = (() => {
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)) ?? []; } catch (_) { return []; }
+})();
 let refreshTimer = null;
 let isPolling = false;
 
@@ -35,6 +38,7 @@ function setBadge(id, state) {
 function pushHistory(state) {
   statusHistory.push(state);
   if (statusHistory.length > MAX_HISTORY) statusHistory.shift();
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(statusHistory)); } catch (_) {}
   renderHistory();
 }
 
@@ -94,6 +98,11 @@ function renderVpnStatus(vpnStatus, vpnSettings, publicIp) {
 function renderPublicIp(publicIp) {
   if (!publicIp.ok) {
     setBadge('badge-ip', 'error');
+    setText('ip-address', '–');
+    setText('ip-country', '–');
+    setText('ip-region', '–');
+    setText('ip-city', '–');
+    setText('ip-org', '–');
     return;
   }
   const d = publicIp.data;
@@ -231,4 +240,5 @@ $('refresh-interval').addEventListener('change', applyAutoRefresh);
 $('btn-start').addEventListener('click', () => vpnAction('start'));
 $('btn-stop').addEventListener('click',  () => vpnAction('stop'));
 
+renderHistory();
 poll().then(() => scheduleNextPoll());

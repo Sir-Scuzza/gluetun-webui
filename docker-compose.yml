@@ -8,7 +8,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000
       # Reaches the gluetun container on the shared arr-stack network
       - GLUETUN_CONTROL_URL=http://gluetun:8000
       # Uncomment ONE of the auth options below if Gluetun has auth enabled:
