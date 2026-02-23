@@ -1,0 +1,37 @@
+name: gluetun-webui
+
+services:
+  gluetun-webui:
+    build: .
+    image: gluetun-webui:latest
+    container_name: gluetun-webui
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Reaches the gluetun container on the shared arr-stack network
+      - GLUETUN_CONTROL_URL=http://gluetun:8000
+      # Uncomment ONE of the auth options below if Gluetun has auth enabled:
+      # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
+      #- GLUETUN_API_KEY=yourtoken
+      # HTTP Basic auth (HTTP_CONTROL_SERVER_AUTH=username:password in gluetun)
+      #- GLUETUN_USER=username
+      #- GLUETUN_PASSWORD=password
+    networks:
+      - arr-stack
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  arr-stack:
+    external: true
+    name: arr-stack_arr-stack

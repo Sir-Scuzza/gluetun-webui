@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gluetun Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="15" stroke="#4ade80" stroke-width="2"/>
+          <path d="M16 8 L16 24 M8 16 L24 16" stroke="#4ade80" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="4" fill="#4ade80"/>
+        </svg>
+        <span>Gluetun Monitor</span>
+      </div>
+      <div class="header-right">
+        <span id="last-updated" class="muted">–</span>
+        <button id="refresh-btn" title="Refresh now">&#x21bb; Refresh</button>
+        <label class="auto-refresh-label" title="Auto-refresh interval">
+          <span>Auto</span>
+          <select id="refresh-interval">
+            <option value="0">Off</option>
+            <option value="5000">5s</option>
+            <option value="10000" selected>10s</option>
+            <option value="30000">30s</option>
+            <option value="60000">60s</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Status banner -->
+    <div id="status-banner" class="status-banner unknown">
+      <div class="banner-icon" id="banner-icon">&#9679;</div>
+      <div class="banner-text">
+        <span id="banner-title">Checking VPN status…</span>
+        <span id="banner-sub" class="muted"></span>
+      </div>
+      <div class="banner-actions">
+        <button id="btn-start" class="btn-success" onclick="vpnAction('start')">&#9654; Start</button>
+        <button id="btn-stop" class="btn-danger" onclick="vpnAction('stop')">&#9646;&#9646; Stop</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Public IP card -->
+      <div class="card" id="card-ip">
+        <div class="card-header">
+          <span class="card-icon">&#127760;</span>
+          <h2>Public IP</h2>
+          <span class="badge" id="badge-ip">–</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value mono" id="ip-address">–</span></div>
+          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="ip-country">–</span></div>
+          <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="ip-region">–</span></div>
+          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="ip-city">–</span></div>
+          <div class="stat-row"><span class="stat-label">Organisation</span><span class="stat-value" id="ip-org">–</span></div>
+        </div>
+      </div>
+
+      <!-- VPN details card -->
+      <div class="card" id="card-vpn">
+        <div class="card-header">
+          <span class="card-icon">&#128274;</span>
+          <h2>VPN Connection</h2>
+          <span class="badge" id="badge-vpn">–</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="vpn-status">–</span></div>
+          <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="vpn-provider">–</span></div>
+          <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="vpn-server">–</span></div>
+          <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="vpn-protocol">–</span></div>
+          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="vpn-country">–</span></div>
+          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="vpn-city">–</span></div>
+        </div>
+      </div>
+
+      <!-- Port forwarding card -->
+      <div class="card" id="card-port">
+        <div class="card-header">
+          <span class="card-icon">&#128268;</span>
+          <h2>Port Forwarding</h2>
+          <span class="badge" id="badge-port">–</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row"><span class="stat-label">Forwarded Port</span><span class="stat-value mono" id="port-number">–</span></div>
+        </div>
+      </div>
+
+      <!-- DNS card -->
+      <div class="card" id="card-dns">
+        <div class="card-header">
+          <span class="card-icon">&#128225;</span>
+          <h2>DNS</h2>
+          <span class="badge" id="badge-dns">–</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="dns-status">–</span></div>
+        </div>
+      </div>
+
+      <!-- Uptime / timeline card -->
+      <div class="card card-wide" id="card-history">
+        <div class="card-header">
+          <span class="card-icon">&#128200;</span>
+          <h2>Status History (last 30 polls)</h2>
+        </div>
+        <div class="card-body">
+          <div id="history-track" class="history-track"></div>
+          <div class="history-legend">
+            <span class="dot connected"></span> Connected &nbsp;
+            <span class="dot disconnected"></span> Disconnected &nbsp;
+            <span class="dot unknown"></span> Unknown
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
