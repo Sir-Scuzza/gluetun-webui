@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:" />
   <title>Gluetun-WebUI</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -44,8 +46,8 @@
         <span id="banner-sub" class="muted"></span>
       </div>
       <div class="banner-actions">
-        <button id="btn-start" class="btn-success" onclick="vpnAction('start')">&#9654; Start</button>
-        <button id="btn-stop" class="btn-danger" onclick="vpnAction('stop')">&#9646;&#9646; Stop</button>
+        <button id="btn-start" class="btn-success">&#9654; Start</button>
+        <button id="btn-stop" class="btn-danger">&#9646;&#9646; Stop</button>
       </div>
     </div>
 
@@ -117,6 +119,7 @@
           <div id="history-track" class="history-track"></div>
           <div class="history-legend">
             <span class="dot connected"></span> Connected &nbsp;
+            <span class="dot paused"></span> Paused &nbsp;
             <span class="dot disconnected"></span> Disconnected &nbsp;
             <span class="dot unknown"></span> Unknown
           </div>

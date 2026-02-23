@@ -1,7 +1,9 @@
 # ---- Build stage ----
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
+# Copy lockfile alongside package.json for deterministic installs.
+# Once package-lock.json is committed, change `npm install` to `npm ci`.
+COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 
 # ---- Final stage ----

@@ -228,8 +228,7 @@ function applyAutoRefresh() {
 
 $('refresh-btn').addEventListener('click', poll);
 $('refresh-interval').addEventListener('change', applyAutoRefresh);
+$('btn-start').addEventListener('click', () => vpnAction('start'));
+$('btn-stop').addEventListener('click',  () => vpnAction('stop'));
 
-// Expose for inline onclick
-window.vpnAction = vpnAction;
-
-poll().then(scheduleNextPoll);
+poll().then(() => scheduleNextPoll());

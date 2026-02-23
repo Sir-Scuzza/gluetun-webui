@@ -1,6 +1,6 @@
 const express = require('express');
 const fetch = require('node-fetch');
-const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const app = express();
@@ -24,24 +24,42 @@ function buildAuthHeaders() {
   return {};
 }
 
-app.use(cors());
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(endpoint, method = 'GET', body = null) {
   const url = `${GLUETUN_URL}${endpoint}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   const opts = {
     method,
-    timeout: 5000,
-    headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+    signal: controller.signal,
+    headers: {
+      ...(body !== null ? { 'Content-Type': 'application/json' } : {}),
+      ...buildAuthHeaders(),
+    },
   };
   if (body !== null) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Gluetun returned ${res.status}${text ? ': ' + text.trim() : ''} for ${endpoint}`);
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Gluetun returned ${res.status}${text ? ': ' + text.trim() : ''} for ${endpoint}`);
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return res.json();
 }
 
 // --- Proxy endpoints ---
@@ -75,7 +93,7 @@ app.get('/api/portforwarded', async (req, res) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const data = await gluetunFetch('/v1/openvpn/settings');
+    const data = await gluetunFetch('/v1/vpn/settings');
     res.json({ ok: true, data });
   } catch (err) {
     res.status(502).json({ ok: false, error: err.message });
@@ -116,7 +134,15 @@ app.get('/api/health', async (req, res) => {
 });
 
 // VPN control actions
-app.put('/api/vpn/:action', async (req, res) => {
+const vpnActionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests, please try again later.' },
+});
+
+app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
   const { action } = req.params;
   const allowed = ['start', 'stop'];
   if (!allowed.includes(action)) {

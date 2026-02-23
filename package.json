@@ -4,14 +4,17 @@
   "description": "Web UI for Gluetun health and monitoring",
   "license": "MIT",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "node-fetch": "^2.7.0",
-    "cors": "^2.8.5"
+    "express-rate-limit": "^7.5.0",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
