@@ -13,6 +13,7 @@ ENV NODE_ENV=production
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package-lock.json ./
 COPY package.json ./
 COPY src/ ./src/
 
