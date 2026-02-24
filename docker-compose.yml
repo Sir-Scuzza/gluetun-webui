@@ -8,7 +8,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      # Reaches the gluetun container on the shared arr-stack network
+      # Reaches the gluetun container on the network
       - GLUETUN_CONTROL_URL=http://gluetun:8000
       # Uncomment ONE of the auth options below if Gluetun has auth enabled:
       # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
@@ -17,7 +17,7 @@ services:
       #- GLUETUN_USER=username
       #- GLUETUN_PASSWORD=password
     networks:
-      - arr-stack
+      - your_network_name # Replace with the actual name of your network
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -41,4 +41,4 @@ services:
 networks:
   arr-stack:
     external: true
-    name: arr-stack_arr-stack
+    name: your_network_name # Replace with the actual name of your network

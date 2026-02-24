@@ -23,13 +23,7 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 ---
 
 ## Screenshots
-
-> Example: VPN connected, WireGuard
-
-| Banner | Cards |
-|--------|-------|
-| Green "VPN Connected" | Public IP, VPN Connection, Port Forwarding, DNS |
-
+![alt text](image.png)
 ---
 
 ## Requirements
@@ -199,18 +193,10 @@ gluetun-webui/
 
 ---
 
-## Development
+## Acknowledgments
 
-```bash
-npm install
-npm run dev    # starts with nodemon, auto-restarts on changes
-```
-
-The dev server expects gluetun reachable at `http://gluetun:8000` by default. Override with:
-
-```bash
-GLUETUN_CONTROL_URL=http://localhost:8000 npm run dev
-```
+- **[Gluetun](https://github.com/qdm12/gluetun)** — The excellent VPN client container this monitor is designed for
+- **[gluetun-monitor](https://github.com/csmarshall/gluetun-monitor)** — Excellent monitoring tool to pair with this webui
 
 ---
 
