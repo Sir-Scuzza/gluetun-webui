@@ -47,6 +47,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+app.use(uiLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(endpoint, method = 'GET', body = null) {
