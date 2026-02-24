@@ -155,6 +155,15 @@ const vpnActionLimiter = rateLimit({
   message: { ok: false, error: 'Too many requests, please try again later.' },
 });
 
+// UI/static route rate limiter – protects filesystem access for SPA index.html
+const uiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests for the web UI, please try again later.',
+});
+
 app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
   const { action } = req.params;
   const allowed = ['start', 'stop'];
