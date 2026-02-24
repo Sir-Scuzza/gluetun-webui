@@ -249,7 +249,7 @@ gluetun-webui/
 
 - **[Gluetun](https://github.com/qdm12/gluetun)** — The excellent VPN client container this webui was designed for
 - **[gluetun-monitor](https://github.com/csmarshall/gluetun-monitor)** — Excellent monitoring tool to pair with this webui
-- **AI-Assisted Development** — This project was helped built with AI assistance
+- **AI-Assisted Development** — This project was built with AI assistance
 
 ---
 
