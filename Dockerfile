@@ -1,11 +1,11 @@
 # ---- Build stage ----
-FROM node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8 AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev --no-fund
 
 # ---- Final stage ----
-FROM node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8
+FROM node:25-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
