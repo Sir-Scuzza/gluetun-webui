@@ -64,9 +64,20 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
+      # Point to your gluetun container
       - GLUETUN_CONTROL_URL=http://gluetun:8000
+      
+      # Uncomment ONE of the auth options below if Gluetun has auth enabled:
+      # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
+      #- GLUETUN_API_KEY=yourtoken
+      
+      # HTTP Basic auth (HTTP_CONTROL_SERVER_AUTH=username:password in gluetun)
+      #- GLUETUN_USER=username
+      #- GLUETUN_PASSWORD=password
+    
     networks:
-      - your_network_name
+      - your_network_name  # ← Change this to match your existing Docker network
+    
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -75,11 +86,24 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
 
 networks:
   ext-network:
     external: true
-    name: your_network_name
+    name: your_network_name  # ← Change this to match your existing Docker network
 ```
 
 ### Option B: Build Locally
