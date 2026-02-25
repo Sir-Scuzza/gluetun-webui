@@ -170,6 +170,15 @@ const vpnActionLimiter = rateLimit({
   message: { ok: false, error: 'Too many requests, please try again later.' },
 });
 
+// Rate limiting for SPA/static index route
+const staticLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests, please try again later.' },
+});
+
 app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
   const { action } = req.params;
   const allowed = ['start', 'stop'];
@@ -192,7 +201,7 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
 // 404 for undefined /api/* routes – must come before SPA catch-all
 app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));
 
-app.get('*', (req, res) => {
+app.get('*', staticLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
