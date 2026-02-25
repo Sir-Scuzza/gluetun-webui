@@ -1,6 +1,6 @@
 # Code Review Findings
 
-> Last reviewed: 2026-02-25 (updated)  
+> Last reviewed: 2026-02-25 (pass 2)  
 > Scope: security, correctness, reliability, code quality  
 > Status key: 🔴 High · 🟡 Medium · 🔵 Low · ✅ Fixed
 
@@ -19,7 +19,7 @@ _No open bugs._
 | S-03 | 🔵 Low | `src/server.js` | **`GLUETUN_CONTROL_URL` is not validated at startup.** The value is used verbatim as a fetch target. A malformed or attacker-controlled value could target arbitrary internal addresses. Validate with `new URL(GLUETUN_URL)` at boot and exit on failure. |
 | S-05 | 🔵 Low | `src/server.js` | **No `Strict-Transport-Security` (HSTS) header.** Intentionally omitted for plain-HTTP local use. Must be added if the app is ever placed behind an HTTPS reverse proxy. |
 | S-06 | 🔵 Low | `src/server.js` | **Rate limiter uses in-memory store.** Counters reset on every container restart. Acceptable for single-instance home use; note for any production or shared deployment. |
-| S-08 | 🔵 Low | `src/server.js` | **No graceful shutdown handler.** The process does not handle `SIGTERM`/`SIGINT`. Docker sends `SIGTERM` on `docker stop`; without a handler, in-flight requests are dropped and the process falls back to `SIGKILL` after the timeout. Add `process.on('SIGTERM', () => server.close())`. |
+| S-08 | 🔵 Low | `src/server.js` | **No graceful shutdown handler.** The process does not handle `SIGTERM`/`SIGINT`. Docker sends `SIGTERM` on `docker stop`; without a handler, in-flight requests are dropped and the process falls back to `SIGKILL` after the timeout. Note: requires storing `app.listen()` result as `const server` first. Add `process.on('SIGTERM', () => server.close())`. |
 
 ### Code Quality / Correctness
 
@@ -31,6 +31,7 @@ _No open bugs._
 | C-04 | 🔵 Low | All | **No tests.** No unit or integration test suite exists. The highest-value targets are `gluetunFetch` error handling, the `renderVpnStatus` state machine, and `renderBanner` output for each state. |
 | C-05 | 🔵 Low | `src/public/app.js` | **`innerHTML` used for spinner markup.** `refreshBtn.innerHTML = '<span class="spin">…</span> Refresh'` is safe (hardcoded string) but inconsistent with the `textContent`-only approach used everywhere else. Use `document.createElement` for consistency. |
 | C-06 | 🔵 Low | `src/server.js` | **`express.json()` runs on every request.** The body parser is registered globally but only the `PUT /api/vpn/:action` route consumes a body. Scope it to that route or to `/api/vpn` to skip unnecessary parsing on GETs. |
+| N-03 | 🔵 Low | `src/public/index.html` | **`<button>` elements missing `type="button"` attribute.** `#refresh-btn`, `#btn-start`, and `#btn-stop` omit the type attribute. The HTML spec defaults `<button>` to `type="submit"`, which is semantically incorrect for action buttons outside a form. Explicitly set `type="button"` on each. |
 
 ### Infrastructure / Docker
 
@@ -43,7 +44,7 @@ _No open bugs._
 ## Fixed Findings (resolved in this review cycle)
 
 <details>
-<summary>Click to expand — 33 issues resolved</summary>
+<summary>Click to expand — 34 issues resolved</summary>
 
 | # | Severity | Finding |
 |---|---|---|
@@ -80,6 +81,7 @@ _No open bugs._
 | S-01 | 🟡 Medium | `express.json()` had no body size limit — tightened to `express.json({ limit: '2kb' })`. |
 | S-07 | 🟡 Medium | Upstream error details leaked to browser in all 7 route handlers and the health endpoint map. Fixed: all catch blocks now log via `console.error('[upstream]', err.message)` server-side and return a generic `'Upstream error'` to the client. |
 | S-02 | 🟡 Medium | No UI-layer authentication documented. Fixed: README Security section expanded with working Caddy, Nginx, and Traefik reverse-proxy auth examples. |
+| N-01 | 🟡 Medium | `uiLimiter` applied globally, unintentionally rate-limiting `/api/*` routes. Fixed: scoped to static file serving only — `app.use(uiLimiter, express.static(...))`. |
 
 </details>
 
@@ -89,13 +91,25 @@ _No open bugs._
 
 1. **C-02** — Reset all card fields in `poll()` catch block
 2. **S-03** — Validate `GLUETUN_CONTROL_URL` at startup with `new URL()`
-3. **S-08** — Add graceful shutdown handler (`SIGTERM` / `SIGINT`)
+3. **S-08** — Store `app.listen()` as `const server`, then add graceful shutdown handler
 4. **C-01** — Remove unused `running` from destructuring in `poll()`
 5. **C-06** — Scope `express.json()` to PUT routes only
-6. **C-04** — Add tests for `gluetunFetch`, `renderVpnStatus`, and `renderBanner`
-7. **C-05** — Replace `innerHTML` spinner with `createElement`
-8. **D-01** — Add container resource limits to `docker-compose.yml`
-9. **C-03** — Plan Express 5 migration (review changelog for breaking changes first)
+6. **N-03** — Add `type="button"` to all three `<button>` elements in `index.html`
+7. **C-04** — Add tests for `gluetunFetch`, `renderVpnStatus`, and `renderBanner`
+8. **C-05** — Replace `innerHTML` spinner with `createElement`
+9. **D-01** — Add container resource limits to `docker-compose.yml`
+10. **C-03** — Plan Express 5 migration (review changelog for breaking changes first)
+
+---
+
+## Recent Updates (2026-02-25 — pass 2)
+
+- **N-01 (Fixed)**: `uiLimiter` was registered via `app.use(uiLimiter)` globally, causing all `/api/*` requests to count against the 100/15-min UI rate limit. At 5s polling the dashboard would 429 in ~8 minutes. Fixed by scoping to `app.use(uiLimiter, express.static(...))` so only static file requests are counted.
+- **N-01 (NEW — 🟡 Medium)**: Full code re-review found `uiLimiter` is applied globally via `app.use(uiLimiter)`, meaning every `/api/*` request counts against the 100/15-minute UI limit. At 5s auto-refresh, the dashboard hits this limit in ~8 minutes and starts returning 429s. Scoping it to static routes only will fix this.
+- **N-03 (NEW — 🔵 Low)**: `#refresh-btn`, `#btn-start`, and `#btn-stop` in `index.html` are missing `type="button"` attributes. HTML spec defaults `<button>` to `type="submit"`.
+- **S-08 (updated)**: Added note that `app.listen()` must be stored as `const server` as a prerequisite before the shutdown handler can be wired up.
+- All other open findings (S-03, S-05, S-06, C-01–C-06, D-01) confirmed still present and unchanged.
+- `.dockerignore` confirmed present and comprehensive — no finding raised.
 
 ---
 

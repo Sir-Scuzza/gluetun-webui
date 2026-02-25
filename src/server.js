@@ -56,8 +56,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '2kb' }));
-app.use(uiLimiter);
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(uiLimiter, express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(endpoint, method = 'GET', body = null) {
   const url = `${GLUETUN_URL}${endpoint}`;
