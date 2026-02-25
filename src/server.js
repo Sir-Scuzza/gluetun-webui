@@ -15,7 +15,7 @@ const GLUETUN_PASSWORD   = process.env.GLUETUN_PASSWORD   || '';
 
 function buildAuthHeaders() {
   if (GLUETUN_API_KEY) {
-    return { Authorization: `Bearer ${GLUETUN_API_KEY}` };
+    return { 'X-API-Key': GLUETUN_API_KEY };
   }
   if (GLUETUN_USER && GLUETUN_PASSWORD) {
     const encoded = Buffer.from(`${GLUETUN_USER}:${GLUETUN_PASSWORD}`).toString('base64');
