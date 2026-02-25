@@ -55,7 +55,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '2kb' }));
 app.use(uiLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -92,7 +92,8 @@ app.get('/api/status', async (req, res) => {
     const data = await gluetunFetch('/v1/vpn/status');
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 
@@ -101,7 +102,8 @@ app.get('/api/publicip', async (req, res) => {
     const data = await gluetunFetch('/v1/publicip/ip');
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 
@@ -110,7 +112,8 @@ app.get('/api/portforwarded', async (req, res) => {
     const data = await gluetunFetch('/v1/portforward');
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 
@@ -119,7 +122,8 @@ app.get('/api/settings', async (req, res) => {
     const data = await gluetunFetch('/v1/vpn/settings');
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 
@@ -128,7 +132,8 @@ app.get('/api/dns', async (req, res) => {
     const data = await gluetunFetch('/v1/dns/status');
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 
@@ -142,8 +147,9 @@ app.get('/api/health', async (req, res) => {
     gluetunFetch('/v1/vpn/settings'),
   ]);
 
+  results.forEach(r => { if (r.status === 'rejected') console.error('[upstream]', r.reason?.message); });
   const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = results.map(r =>
-    r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: r.reason?.message }
+    r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
   );
 
   res.json({
@@ -179,7 +185,8 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
     );
     res.json({ ok: true, data });
   } catch (err) {
-    res.status(502).json({ ok: false, error: err.message });
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
 

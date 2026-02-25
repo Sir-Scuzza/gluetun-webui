@@ -1,38 +1,37 @@
-# Gluetun Webui
+# Gluetun WebUI
 
 A lightweight web UI for monitoring and controlling [Gluetun](https://github.com/qdm12/gluetun) — the VPN client container for Docker.
 
 ![Status: Connected](https://img.shields.io/badge/status-connected-brightgreen)
-![Node 20](https://img.shields.io/badge/node-20--alpine-blue)
+![Node 25](https://img.shields.io/badge/node-25--alpine-blue)
 ![Docker](https://img.shields.io/badge/docker-compose-blue)
 
 ---
 
 ## Features
 
-- **VPN status** — live running/stopped/paused state with visual banner
-- **Public IP details** — exit IP, country, region, city, organisation
-- **VPN connection details** — provider, protocol (WireGuard or OpenVPN auto-detected), server hostname, country, city
-- **Port forwarding** — shows the currently forwarded port if enabled
-- **DNS status** — confirms gluetun's internal DNS resolver is running
-- **Start / Stop controls** — send start/stop commands to gluetun from the UI
-- **Auto-refresh** — configurable polling interval (5s / 10s / 30s / 60s / off)
-- **Poll history** — last 30 status ticks colour-coded (connected / paused / disconnected / unknown)
-- **No poll stacking** — uses recursive `setTimeout` + in-flight guard to prevent overlapping requests
+- Live VPN status banner (connected / paused / disconnected)
+- Public exit IP, country, region, city, and organisation
+- VPN provider, protocol (WireGuard / OpenVPN), server details
+- Port forwarding and DNS status
+- Start / Stop VPN controls
+- Auto-refresh with configurable interval (5s – 60s)
+- Last 30 poll ticks colour-coded in history bar
 
 ---
 
 ## Screenshots
 ![alt text](image.png)
+
 ---
 
 ## Requirements
 
 - Docker + Docker Compose
 - Gluetun running with its HTTP control server enabled (default port `8000`)
-- Both containers on the same Docker network
+- Gluetun and gluetun-webui on the same Docker network
 
-> **Multi-platform support:** The Docker image supports both `linux/amd64` and `linux/arm64`, so it works seamlessly on Mac (Intel & Apple Silicon), Linux, and Windows.
+> Supports `linux/amd64` and `linux/arm64` (works on Mac Intel/Apple Silicon, Linux, and Windows).
 
 ---
 
@@ -40,241 +39,147 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 
 ### Option A: Docker Hub (Recommended)
 
-Use the pre-built image from Docker Hub:
+Add `gluetun-webui` to your existing compose file alongside Gluetun:
 
-```bash
-docker pull scuzza/gluetun-webui:latest
+```yaml
+gluetun-webui:
+  image: scuzza/gluetun-webui:latest
+  container_name: gluetun-webui
+  ports:
+    - "127.0.0.1:3000:3000"
+  environment:
+    - GLUETUN_CONTROL_URL=http://gluetun:8000
+    # Uncomment if Gluetun auth is enabled:
+    #- GLUETUN_API_KEY=yourtoken
+    #- GLUETUN_USER=username
+    #- GLUETUN_PASSWORD=password
+  networks:
+    - your_network_name
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+    interval: 30s
+    timeout: 5s
+    start_period: 10s
+    retries: 3
 ```
 
-Then create a `docker-compose.yml` (see example below) and run:
+Then run:
 
 ```bash
 docker compose up -d
-```
-
-**Example docker-compose.yml:**
-
-```yaml
-name: gluetun-webui
-
-services:
-  gluetun-webui:
-    image: scuzza/gluetun-webui:latest
-    container_name: gluetun-webui
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      # Point to your gluetun container
-      - GLUETUN_CONTROL_URL=http://gluetun:8000
-      
-      # Uncomment ONE of the auth options below if Gluetun has auth enabled:
-      # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
-      #- GLUETUN_API_KEY=yourtoken
-      
-      # HTTP Basic auth (HTTP_CONTROL_SERVER_AUTH=username:password in gluetun)
-      #- GLUETUN_USER=username
-      #- GLUETUN_PASSWORD=password
-    
-    networks:
-      - your_network_name  # ← Change this to match your existing Docker network
-    
-    restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-    
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-
-networks:
-  ext-network:
-    external: true
-    name: your_network_name  # ← Change this to match your existing Docker network
-```
-
-### Option B: Build Locally
-
-Clone and build from source:
-
-```bash
-git clone https://github.com/Sir-Scuzza/gluetun-webui.git
-cd gluetun-webui
-```
-
-### 4. Configure
-
-Edit your `docker-compose.yml` and set the network name to match your existing stack:
-
-```yaml
-networks:
-  ext-network:
-    external: true
-    name: your_network_name   # ← change this
-```
-
-If gluetun has auth enabled, uncomment the relevant env vars:
-
-```yaml
-environment:
-  - GLUETUN_CONTROL_URL=http://gluetun:8000
-  # Bearer token auth:
-  # - GLUETUN_API_KEY=yourtoken
-  # HTTP Basic auth:
-  # - GLUETUN_USER=username
-  # - GLUETUN_PASSWORD=password
-```
-
-### 5. Deploy
-
-For Docker Hub images, use:
-```bash
-docker compose up -d
-```
-
-For local builds, use:
-```bash
-docker compose up -d --build
 ```
 
 The UI is available at **http://localhost:3000**
 
-> **Note:** The port is bound to `127.0.0.1` only. It is not exposed to the wider network. To access it remotely, use a reverse proxy (see [Security](#security)).
+### Option B: Build Locally
+
+```bash
+git clone https://github.com/Sir-Scuzza/gluetun-webui.git
+cd gluetun-webui
+docker compose up -d --build
+```
+
+---
+
+## Network Setup
+
+Both Gluetun and gluetun-webui must be on the same Docker network so `http://gluetun:8000` resolves correctly.
+
+**Same compose file** — just add both services to the same network (most common):
+
+```yaml
+services:
+  gluetun:
+    networks:
+      - arr-stack
+  gluetun-webui:
+    networks:
+      - arr-stack
+
+networks:
+  arr-stack:
+    driver: bridge
+```
+
+**Separate compose files** — reference Gluetun's existing network as external. Find your network name with `docker network ls`:
+
+```yaml
+networks:
+  ext-network:
+    external: true
+    name: your_gluetun_network_name
+```
 
 ---
 
 ## Configuration
 
-All configuration is via environment variables:
-
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3000` | Port the web UI listens on |
-| `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | URL of gluetun's HTTP control server |
-| `GLUETUN_API_KEY` | _(empty)_ | Bearer token (if gluetun API key auth is enabled) |
+| `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | Gluetun HTTP control server URL |
+| `GLUETUN_API_KEY` | _(empty)_ | Bearer token (if Gluetun API key auth is enabled) |
 | `GLUETUN_USER` | _(empty)_ | Username for HTTP Basic auth |
 | `GLUETUN_PASSWORD` | _(empty)_ | Password for HTTP Basic auth |
-
----
-
-## API Endpoints
-
-The Node.js server proxies gluetun's control API and exposes:
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Aggregate snapshot of all status endpoints |
-| `GET` | `/api/status` | VPN running status |
-| `GET` | `/api/publicip` | Public exit IP and geo info |
-| `GET` | `/api/portforwarded` | Forwarded port number |
-| `GET` | `/api/settings` | VPN provider and protocol settings |
-| `GET` | `/api/dns` | DNS resolver status |
-| `PUT` | `/api/vpn/start` | Start the VPN tunnel |
-| `PUT` | `/api/vpn/stop` | Stop the VPN tunnel |
-
----
-
-## Status Indicators
-
-### Banner states
-
-| State | Colour | Meaning |
-|---|---|---|
-| **VPN Connected** | Green | Tunnel is up and running |
-| **VPN Paused** | Yellow | Gluetun is reachable but VPN process is stopped |
-| **VPN Disconnected** | Red | Tunnel is down |
-| **Status Unknown** | Yellow | Could not reach gluetun control API |
-
-### Badge states
-
-| Badge | Colour | Meaning |
-|---|---|---|
-| OK | Green | Service healthy |
-| Warn | Yellow | Service reachable but not running |
-| Error | Red | Service unreachable |
-
----
-
-## Gluetun API Endpoints Used
-
-| Gluetun endpoint | Purpose |
-|---|---|
-| `GET /v1/vpn/status` | Protocol-agnostic VPN running state |
-| `PUT /v1/vpn/status` | Start / stop the VPN |
-| `GET /v1/vpn/settings` | Provider name, protocol type (wireguard/openvpn) |
-| `GET /v1/publicip/ip` | Exit IP, country, city, hostname |
-| `GET /v1/portforward` | Forwarded port |
-| `GET /v1/dns/status` | DNS resolver status |
-
-> **Note:** `/v1/vpn/status` and `/v1/vpn/settings` are protocol-agnostic — this UI works with both WireGuard and OpenVPN without any configuration change.
+| `PORT` | `3000` | Port the web UI listens on |
 
 ---
 
 ## Security
 
-### Rate limiting
-
-The server enforces per-IP rate limits to protect the upstream Gluetun API:
-
-| Scope | Limit |
-|---|---|
-| All `GET /api/*` routes | 120 requests / minute |
-| `PUT /api/vpn/:action` | 10 requests / minute |
-
-### Security headers
-
-Every response includes: `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`.
-
-### Docker hardening
-
-The provided `docker-compose.yml` and `Dockerfile` apply the following hardening by default:
-
-- Port bound to `127.0.0.1` only (not exposed to the network)
-- Non-root user inside the container
-- Read-only root filesystem (`read_only: true`) with a `tmpfs` at `/tmp`
-- `no-new-privileges: true` and `cap_drop: ALL`
-- `X-Powered-By` header suppressed
+- Port is bound to `127.0.0.1` — not exposed to the network
+- Container runs as non-root with read-only filesystem and dropped capabilities
+- Rate limiting applied to all API routes
+- Upstream error details are logged server-side only — generic messages returned to the browser
 
 ### Reverse-proxy authentication
 
-The VPN start/stop endpoints (`PUT /api/vpn/:action`) have no UI-layer authentication. If you expose this service beyond localhost, place it behind a reverse proxy with HTTP Basic auth (Nginx, Caddy, Traefik, etc.).
+The VPN start/stop controls have no built-in authentication. If you expose the UI beyond localhost, place it behind a reverse proxy with HTTP Basic auth.
 
----
-
-## Project Structure
-
+**Caddy** (`Caddyfile`):
 ```
-gluetun-webui/
-├── Dockerfile
-├── docker-compose.yml
-├── package.json
-└── src/
-    ├── server.js          # Express proxy server
-    └── public/
-        ├── index.html     # UI markup
-        ├── app.js         # Polling, rendering, VPN control logic
-        └── style.css      # Dark theme styles
+your.domain.com {
+  basicauth {
+    user $2a$14$<bcrypt-hash>
+  }
+  reverse_proxy localhost:3000
+}
 ```
+Generate a hash with: `caddy hash-password`
+
+**Nginx** (`nginx.conf`):
+```nginx
+location / {
+  auth_basic "Restricted";
+  auth_basic_user_file /etc/nginx/.htpasswd;
+  proxy_pass http://localhost:3000;
+}
+```
+Generate a password file with: `htpasswd -c /etc/nginx/.htpasswd user`
+
+**Traefik** (Docker labels):
+```yaml
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.gluetun-webui.rule=Host(`your.domain.com`)"
+  - "traefik.http.routers.gluetun-webui.middlewares=auth"
+  - "traefik.http.middlewares.auth.basicauth.users=user:$$apr1$$<hash>"
+```
+Generate a hash with: `htpasswd -nb user password`
 
 ---
 
 ## Acknowledgments
 
-- **[Gluetun](https://github.com/qdm12/gluetun)** — The excellent VPN client container this webui was designed for
-- **[gluetun-monitor](https://github.com/csmarshall/gluetun-monitor)** — Excellent monitoring tool to pair with this webui
+- **[Gluetun](https://github.com/qdm12/gluetun)** — The VPN client container this webui was built for
+- **[gluetun-monitor](https://github.com/csmarshall/gluetun-monitor)** — Great monitoring tool to pair with this webui
 - **AI-Assisted Development** — This project was built with AI assistance
 
 ---

@@ -19,7 +19,7 @@ services:
       #- GLUETUN_PASSWORD=password
     
     networks:
-      - your_network_name  # ← Change this to match your existing Docker network
+      - ext-network
     
     restart: unless-stopped
     read_only: true
