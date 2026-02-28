@@ -84,10 +84,16 @@ async function gluetunFetch(endpoint, method = 'GET', body = null, baseUrl = '',
   };
   if (body !== null) opts.body = JSON.stringify(body);
   try {
-    const res = await fetch(url, opts);
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (fetchErr) {
+      const cause = fetchErr.cause?.code || fetchErr.cause?.message || fetchErr.message;
+      throw new Error(`fetch failed for ${endpoint} (${cause})`);
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`Gluetun returned ${res.status}${text ? ': ' + text.slice(0, 200).trim() : ''}`);
+      throw new Error(`Gluetun returned ${res.status} for ${endpoint}${text ? ': ' + text.slice(0, 200).trim() : ''}`);
     }
     return res.json();
   } finally {
@@ -136,7 +142,7 @@ app.get('/api/portforwarded', async (req, res) => {
   const inst = resolveInstance(req, res);
   if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/portforward', 'GET', null, inst.url, inst.apiKey);
+    const data = await gluetunFetch('/v1/openvpn/portforwarded', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -175,7 +181,7 @@ app.get('/api/health', async (req, res) => {
   const results = await Promise.allSettled([
     gluetunFetch('/v1/vpn/status',   'GET', null, inst.url, inst.apiKey),
     gluetunFetch('/v1/publicip/ip',  'GET', null, inst.url, inst.apiKey),
-    gluetunFetch('/v1/portforward',  'GET', null, inst.url, inst.apiKey),
+    gluetunFetch('/v1/openvpn/portforwarded', 'GET', null, inst.url, inst.apiKey),
     gluetunFetch('/v1/dns/status',   'GET', null, inst.url, inst.apiKey),
     gluetunFetch('/v1/vpn/settings', 'GET', null, inst.url, inst.apiKey),
   ]);
