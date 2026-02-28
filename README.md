@@ -55,6 +55,107 @@ The UI is available at **http://localhost:3000**
 
 ---
 
+## Integrating into an existing Docker Compose
+
+If you already have a Docker Compose file that runs Gluetun, follow these steps to add gluetun-webui to it.
+
+### 1 — Clone the repository
+
+```bash
+git clone https://github.com/pinkfloydFR/gluetun-webui.git /opt/gluetun-webui
+```
+
+### 2 — Add the service to your existing `docker-compose.yml`
+
+In the `services:` block, add:
+
+```yaml
+  gluetun-webui:
+    build: /opt/gluetun-webui   # path to where you cloned the repo
+    container_name: gluetun-webui
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GLUETUN_CONTROL_URL=http://gluetun:8000   # service name of your gluetun container
+      # Optional — only needed if Gluetun has auth enabled:
+      #- GLUETUN_API_KEY=yourtoken
+    networks:
+      - your_gluetun_network     # must be the same network as your gluetun service
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+```
+
+### 3 — Start (and build) only the new service
+
+```bash
+docker compose up -d --build gluetun-webui
+```
+
+The `--build` flag compiles the image from the local `Dockerfile`; the other
+services in your compose file are not restarted.
+
+### Full example (two Gluetun instances)
+
+```yaml
+services:
+
+  gluetun-fr:
+    image: qmcgaw/gluetun
+    # … your existing gluetun config …
+    networks:
+      - arr-stack
+
+  gluetun-us:
+    image: qmcgaw/gluetun
+    # … your existing gluetun config …
+    networks:
+      - arr-stack
+
+  gluetun-webui:
+    build: /opt/gluetun-webui
+    container_name: gluetun-webui
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GLUETUN_1_NAME=Gluetun FR
+      - GLUETUN_1_URL=http://gluetun-fr:8000
+      - GLUETUN_2_NAME=Gluetun US
+      - GLUETUN_2_URL=http://gluetun-us:8000
+    networks:
+      - arr-stack
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  arr-stack:
+    driver: bridge
+```
+
+---
+
 ## Network Setup
 
 Both Gluetun and gluetun-webui must be on the same Docker network so `http://gluetun:8000` resolves correctly.

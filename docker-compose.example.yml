@@ -1,26 +1,58 @@
 name: gluetun-webui
 
+# ─────────────────────────────────────────────────────────────────────────────
+# HOW TO USE THIS FILE
+# ─────────────────────────────────────────────────────────────────────────────
+# There is no pre-built image for this fork.  You must build it locally.
+#
+# 1. Clone this repository somewhere on your host:
+#      git clone https://github.com/pinkfloydFR/gluetun-webui.git /opt/gluetun-webui
+#
+# 2a. Stand-alone (only this service):
+#      docker compose -f docker-compose.example.yml up -d --build
+#
+# 2b. Added to your existing Gluetun compose file:
+#      Copy the `gluetun-webui` service block below into your own
+#      docker-compose.yml, adjust REPO_PATH and the network name,
+#      then run:  docker compose up -d --build gluetun-webui
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
   gluetun-webui:
+    # Build the image from the cloned repository.
+    # If running this file from inside the cloned repo, `build: .` is enough.
+    # If merging this block into a compose file that lives elsewhere, use an
+    # absolute path to where you cloned the repo, e.g.:
+    #   build: /opt/gluetun-webui
     build: .
     container_name: gluetun-webui
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      # Point to your gluetun container
+      # ── Single Gluetun instance ──────────────────────────────────────────
+      # Legacy variable — still fully supported, maps to instance 1.
       - GLUETUN_CONTROL_URL=http://gluetun:8000
-      
+
       # Uncomment ONE of the auth options below if Gluetun has auth enabled:
       # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
       #- GLUETUN_API_KEY=yourtoken
-      
+
       # HTTP Basic auth (HTTP_CONTROL_SERVER_AUTH=username:password in gluetun)
       #- GLUETUN_USER=username
       #- GLUETUN_PASSWORD=password
-    
+
+      # ── Two Gluetun instances (recommended when you run two containers) ──
+      # Remove/comment the legacy variables above and use these instead.
+      #- GLUETUN_1_NAME=Gluetun FR
+      #- GLUETUN_1_URL=http://gluetun-fr:8000
+      #- GLUETUN_1_API_KEY=token_for_instance_1
+      #- GLUETUN_2_NAME=Gluetun US
+      #- GLUETUN_2_URL=http://gluetun-us:8000
+      #- GLUETUN_2_API_KEY=token_for_instance_2
+
     networks:
       - ext-network
-    
+
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -29,14 +61,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    
+
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 5s
       start_period: 10s
       retries: 3
-    
+
     logging:
       driver: "json-file"
       options:
@@ -47,3 +79,4 @@ networks:
   ext-network:
     external: true
     name: your_network_name  # ← Change this to match your existing Docker network
+                              #   (find it with: docker network ls)
