@@ -117,6 +117,22 @@ async function fetchVpnSettings(baseUrl, apiKey) {
   }
 }
 
+// Tries /v1/portforward first (current Gluetun endpoint); falls back to
+// /v1/openvpn/portforwarded on 404 for older Gluetun versions.
+// Note: newer Gluetun redirects /v1/openvpn/portforwarded → /v1/portforward,
+// so calling the new endpoint directly avoids redirect-induced 401s when the
+// redirect target is not listed in a role-based ACL.
+async function fetchPortForwarded(baseUrl, apiKey) {
+  try {
+    return await gluetunFetch('/v1/portforward', 'GET', null, baseUrl, apiKey);
+  } catch (err) {
+    if (err.status === 404) {
+      return gluetunFetch('/v1/openvpn/portforwarded', 'GET', null, baseUrl, apiKey);
+    }
+    throw err;
+  }
+}
+
 function handleUpstreamError(err, res) {
   console.error('[upstream]', err.message);
   if (err.status === 401) {
@@ -164,7 +180,7 @@ app.get('/api/portforwarded', async (req, res) => {
   const inst = resolveInstance(req, res);
   if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/openvpn/portforwarded', 'GET', null, inst.url, inst.apiKey);
+    const data = await fetchPortForwarded(inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     handleUpstreamError(err, res);
@@ -200,13 +216,17 @@ app.get('/api/health', async (req, res) => {
   const results = await Promise.allSettled([
     gluetunFetch('/v1/vpn/status',   'GET', null, inst.url, inst.apiKey),
     gluetunFetch('/v1/publicip/ip',  'GET', null, inst.url, inst.apiKey),
-    gluetunFetch('/v1/openvpn/portforwarded', 'GET', null, inst.url, inst.apiKey),
+    fetchPortForwarded(inst.url, inst.apiKey),
     gluetunFetch('/v1/dns/status',   'GET', null, inst.url, inst.apiKey),
     fetchVpnSettings(inst.url, inst.apiKey),
   ]);
 
   results.forEach(r => { if (r.status === 'rejected') console.error('[upstream]', r.reason?.message); });
-  const authError = results.some(r => r.status === 'rejected' && r.reason?.status === 401);
+  // Only treat it as an auth error when the primary VPN status endpoint itself
+  // returns 401.  Secondary endpoints (port-forward, settings) may legitimately
+  // return 401 when a role-based ACL omits them; that should not block the
+  // entire dashboard with a misleading "set your API key" banner.
+  const authError = results[0].status === 'rejected' && results[0].reason?.status === 401;
   const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = results.map(r =>
     r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
   );

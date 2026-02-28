@@ -36,6 +36,13 @@ services:
       # Uncomment ONE of the auth options below if Gluetun has auth enabled:
       # Bearer token (HTTP_CONTROL_SERVER_AUTH=apikey:yourtoken in gluetun)
       #- GLUETUN_API_KEY=yourtoken
+      #
+      # If you use a role-based ACL in Gluetun, the role must include at least:
+      #   GET /v1/vpn/status       PUT /v1/vpn/status
+      #   GET /v1/publicip/ip
+      #   GET /v1/portforward                        ← new endpoint name (older versions: GET /v1/openvpn/portforwarded)
+      #   GET /v1/dns/status
+      #   GET /v1/vpn/settings                       ← unified settings (older versions: GET /v1/openvpn/settings)
 
       # HTTP Basic auth (HTTP_CONTROL_SERVER_AUTH=username:password in gluetun)
       #- GLUETUN_USER=username
