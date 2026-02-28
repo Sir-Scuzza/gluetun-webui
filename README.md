@@ -48,11 +48,14 @@ gluetun-webui:
   ports:
     - "127.0.0.1:3000:3000"
   environment:
-    - GLUETUN_CONTROL_URL=http://gluetun:8000
-    # Uncomment if Gluetun auth is enabled:
-    #- GLUETUN_API_KEY=yourtoken
-    #- GLUETUN_USER=username
-    #- GLUETUN_PASSWORD=password
+    # Instance 1
+    - GLUETUN_1_NAME=Gluetun 1
+    - GLUETUN_1_URL=http://gluetun1:8000
+    # - GLUETUN_1_API_KEY=yourtoken1
+    # Instance 2 (omit or leave GLUETUN_2_URL empty to show as unavailable)
+    - GLUETUN_2_NAME=Gluetun 2
+    - GLUETUN_2_URL=http://gluetun2:8000
+    # - GLUETUN_2_API_KEY=yourtoken2
   networks:
     - your_network_name
   restart: unless-stopped
@@ -64,7 +67,7 @@ gluetun-webui:
   cap_drop:
     - ALL
   healthcheck:
-    test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+    test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/instances"]
     interval: 30s
     timeout: 5s
     start_period: 10s
@@ -122,13 +125,26 @@ networks:
 
 ## Configuration
 
+### Two-instance mode (recommended)
+
 | Variable | Default | Description |
 |---|---|---|
-| `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | Gluetun HTTP control server URL |
-| `GLUETUN_API_KEY` | _(empty)_ | Bearer token (if Gluetun API key auth is enabled) |
-| `GLUETUN_USER` | _(empty)_ | Username for HTTP Basic auth |
-| `GLUETUN_PASSWORD` | _(empty)_ | Password for HTTP Basic auth |
+| `GLUETUN_1_NAME` | `Gluetun 1` | Display name for instance 1 |
+| `GLUETUN_1_URL` | _(from `GLUETUN_CONTROL_URL`)_ | Gluetun HTTP control server URL for instance 1 |
+| `GLUETUN_1_API_KEY` | _(from `GLUETUN_API_KEY`)_ | Bearer token for instance 1 (if API key auth is enabled) |
+| `GLUETUN_2_NAME` | `Gluetun 2` | Display name for instance 2 |
+| `GLUETUN_2_URL` | _(empty)_ | Gluetun HTTP control server URL for instance 2 (leave empty to show as unavailable) |
+| `GLUETUN_2_API_KEY` | _(empty)_ | Bearer token for instance 2 (if API key auth is enabled) |
 | `PORT` | `3000` | Port the web UI listens on |
+
+### Legacy single-instance variables (still supported)
+
+| Variable | Default | Description |
+|---|---|---|
+| `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | Gluetun HTTP control server URL (maps to instance 1 if `GLUETUN_1_URL` is not set) |
+| `GLUETUN_API_KEY` | _(empty)_ | Bearer token (maps to instance 1 if `GLUETUN_1_API_KEY` is not set) |
+
+> **Note:** The UI always shows two fixed columns. If instance 2 is not configured (`GLUETUN_2_URL` is empty), the second column remains visible but shows "Not Configured".
 
 ---
 

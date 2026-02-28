@@ -34,7 +34,7 @@ header {
   z-index: 100;
 }
 .header-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0.75rem 1.5rem;
   display: flex;
@@ -89,10 +89,47 @@ select {
 
 /* ---- Main ---- */
 main {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 1.5rem auto;
   padding: 0 1.5rem 3rem;
 }
+
+/* ---- Instances container ---- */
+.instances-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.instance-col {
+  min-width: 0;
+}
+
+.instance-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.instance-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.instance-badge.configured   { background: rgba(74,222,128,0.15); color: var(--green);  border-color: var(--green); }
+.instance-badge.unconfigured { background: rgba(100,116,139,0.1); color: var(--muted);  border-color: var(--muted); }
 
 /* ---- Status banner ---- */
 .status-banner {
@@ -118,8 +155,8 @@ main {
 .status-banner.unknown      .banner-icon { color: var(--muted); }
 
 .banner-text { flex: 1; }
-#banner-title { font-size: 1.05rem; font-weight: 600; display: block; }
-#banner-sub   { font-size: 0.82rem; }
+.banner-title { font-size: 1.05rem; font-weight: 600; display: block; }
+.banner-sub   { font-size: 0.82rem; }
 
 .banner-actions { display: flex; gap: 0.5rem; }
 .btn-success { border-color: var(--green); color: var(--green); }
@@ -241,6 +278,9 @@ main {
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 
 /* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .instances-container { grid-template-columns: 1fr; }
+}
 @media (max-width: 600px) {
   .header-inner { flex-direction: column; align-items: flex-start; }
   .banner-actions { flex-direction: column; }

@@ -36,94 +36,191 @@
   </header>
 
   <main>
-    <!-- Status banner -->
-    <div id="status-banner" class="status-banner unknown">
-      <div class="banner-icon">&#9679;</div>
-      <div class="banner-text">
-        <span id="banner-title">Checking VPN status…</span>
-        <span id="banner-sub" class="muted"></span>
-      </div>
-      <div class="banner-actions">
-        <button id="btn-start" class="btn-success">&#9654; Start</button>
-        <button id="btn-stop" class="btn-danger">&#9209; Stop</button>
-      </div>
-    </div>
+    <div class="instances-container">
 
-    <div class="grid">
-      <!-- Public IP card -->
-      <div class="card" id="card-ip">
-        <div class="card-header">
-          <span class="card-icon">&#127760;</span>
-          <h2>Public IP</h2>
-          <span class="badge" id="badge-ip">–</span>
+      <!-- ===== Instance 1 ===== -->
+      <div class="instance-col" id="instance-col-1">
+        <div class="instance-header">
+          <span id="i1-instance-name">Gluetun 1</span>
+          <span id="i1-instance-badge" class="instance-badge">–</span>
         </div>
-        <div class="card-body">
-          <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value mono" id="ip-address">–</span></div>
-          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="ip-country">–</span></div>
-          <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="ip-region">–</span></div>
-          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="ip-city">–</span></div>
-          <div class="stat-row"><span class="stat-label">Organisation</span><span class="stat-value" id="ip-org">–</span></div>
-        </div>
-      </div>
 
-      <!-- VPN details card -->
-      <div class="card" id="card-vpn">
-        <div class="card-header">
-          <span class="card-icon">&#128274;</span>
-          <h2>VPN Connection</h2>
-          <span class="badge" id="badge-vpn">–</span>
+        <div id="i1-status-banner" class="status-banner unknown">
+          <div class="banner-icon">&#9679;</div>
+          <div class="banner-text">
+            <span id="i1-banner-title" class="banner-title">Checking VPN status…</span>
+            <span id="i1-banner-sub" class="banner-sub muted"></span>
+          </div>
+          <div class="banner-actions">
+            <button id="i1-btn-start" class="btn-success">&#9654; Start</button>
+            <button id="i1-btn-stop" class="btn-danger">&#9209; Stop</button>
+          </div>
         </div>
-        <div class="card-body">
-          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="vpn-status">–</span></div>
-          <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="vpn-provider">–</span></div>
-          <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="vpn-server">–</span></div>
-          <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="vpn-protocol">–</span></div>
-          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="vpn-country">–</span></div>
-          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="vpn-city">–</span></div>
-        </div>
-      </div>
 
-      <!-- Port forwarding card -->
-      <div class="card" id="card-port">
-        <div class="card-header">
-          <span class="card-icon">&#128268;</span>
-          <h2>Port Forwarding</h2>
-          <span class="badge" id="badge-port">–</span>
-        </div>
-        <div class="card-body">
-          <div class="stat-row"><span class="stat-label">Forwarded Port</span><span class="stat-value mono" id="port-number">–</span></div>
-        </div>
-      </div>
+        <div class="grid">
+          <div class="card" id="i1-card-ip">
+            <div class="card-header">
+              <span class="card-icon">&#127760;</span>
+              <h2>Public IP</h2>
+              <span class="badge" id="i1-badge-ip">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value mono" id="i1-ip-address">–</span></div>
+              <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i1-ip-country">–</span></div>
+              <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="i1-ip-region">–</span></div>
+              <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i1-ip-city">–</span></div>
+              <div class="stat-row"><span class="stat-label">Organisation</span><span class="stat-value" id="i1-ip-org">–</span></div>
+            </div>
+          </div>
 
-      <!-- DNS card -->
-      <div class="card" id="card-dns">
-        <div class="card-header">
-          <span class="card-icon">&#128225;</span>
-          <h2>DNS</h2>
-          <span class="badge" id="badge-dns">–</span>
-        </div>
-        <div class="card-body">
-          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="dns-status">–</span></div>
-        </div>
-      </div>
+          <div class="card" id="i1-card-vpn">
+            <div class="card-header">
+              <span class="card-icon">&#128274;</span>
+              <h2>VPN Connection</h2>
+              <span class="badge" id="i1-badge-vpn">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i1-vpn-status">–</span></div>
+              <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i1-vpn-provider">–</span></div>
+              <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="i1-vpn-server">–</span></div>
+              <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i1-vpn-protocol">–</span></div>
+              <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i1-vpn-country">–</span></div>
+              <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i1-vpn-city">–</span></div>
+            </div>
+          </div>
 
-      <!-- Uptime / timeline card -->
-      <div class="card card-wide" id="card-history">
-        <div class="card-header">
-          <span class="card-icon">&#128200;</span>
-          <h2>Status History (last 30 polls)</h2>
-        </div>
-        <div class="card-body">
-          <div id="history-track" class="history-track"></div>
-          <div class="history-legend">
-            <span class="dot connected"></span> Connected &nbsp;
-            <span class="dot paused"></span> Paused &nbsp;
-            <span class="dot disconnected"></span> Disconnected &nbsp;
-            <span class="dot unknown"></span> Unknown
+          <div class="card" id="i1-card-port">
+            <div class="card-header">
+              <span class="card-icon">&#128268;</span>
+              <h2>Port Forwarding</h2>
+              <span class="badge" id="i1-badge-port">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Forwarded Port</span><span class="stat-value mono" id="i1-port-number">–</span></div>
+            </div>
+          </div>
+
+          <div class="card" id="i1-card-dns">
+            <div class="card-header">
+              <span class="card-icon">&#128225;</span>
+              <h2>DNS</h2>
+              <span class="badge" id="i1-badge-dns">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i1-dns-status">–</span></div>
+            </div>
+          </div>
+
+          <div class="card card-wide" id="i1-card-history">
+            <div class="card-header">
+              <span class="card-icon">&#128200;</span>
+              <h2>Status History (last 30 polls)</h2>
+            </div>
+            <div class="card-body">
+              <div id="i1-history-track" class="history-track"></div>
+              <div class="history-legend">
+                <span class="dot connected"></span> Connected &nbsp;
+                <span class="dot paused"></span> Paused &nbsp;
+                <span class="dot disconnected"></span> Disconnected &nbsp;
+                <span class="dot unknown"></span> Unknown
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- ===== Instance 2 ===== -->
+      <div class="instance-col" id="instance-col-2">
+        <div class="instance-header">
+          <span id="i2-instance-name">Gluetun 2</span>
+          <span id="i2-instance-badge" class="instance-badge">–</span>
+        </div>
+
+        <div id="i2-status-banner" class="status-banner unknown">
+          <div class="banner-icon">&#9679;</div>
+          <div class="banner-text">
+            <span id="i2-banner-title" class="banner-title">Checking VPN status…</span>
+            <span id="i2-banner-sub" class="banner-sub muted"></span>
+          </div>
+          <div class="banner-actions">
+            <button id="i2-btn-start" class="btn-success">&#9654; Start</button>
+            <button id="i2-btn-stop" class="btn-danger">&#9209; Stop</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card" id="i2-card-ip">
+            <div class="card-header">
+              <span class="card-icon">&#127760;</span>
+              <h2>Public IP</h2>
+              <span class="badge" id="i2-badge-ip">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value mono" id="i2-ip-address">–</span></div>
+              <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i2-ip-country">–</span></div>
+              <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="i2-ip-region">–</span></div>
+              <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i2-ip-city">–</span></div>
+              <div class="stat-row"><span class="stat-label">Organisation</span><span class="stat-value" id="i2-ip-org">–</span></div>
+            </div>
+          </div>
+
+          <div class="card" id="i2-card-vpn">
+            <div class="card-header">
+              <span class="card-icon">&#128274;</span>
+              <h2>VPN Connection</h2>
+              <span class="badge" id="i2-badge-vpn">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i2-vpn-status">–</span></div>
+              <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i2-vpn-provider">–</span></div>
+              <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="i2-vpn-server">–</span></div>
+              <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i2-vpn-protocol">–</span></div>
+              <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i2-vpn-country">–</span></div>
+              <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i2-vpn-city">–</span></div>
+            </div>
+          </div>
+
+          <div class="card" id="i2-card-port">
+            <div class="card-header">
+              <span class="card-icon">&#128268;</span>
+              <h2>Port Forwarding</h2>
+              <span class="badge" id="i2-badge-port">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Forwarded Port</span><span class="stat-value mono" id="i2-port-number">–</span></div>
+            </div>
+          </div>
+
+          <div class="card" id="i2-card-dns">
+            <div class="card-header">
+              <span class="card-icon">&#128225;</span>
+              <h2>DNS</h2>
+              <span class="badge" id="i2-badge-dns">–</span>
+            </div>
+            <div class="card-body">
+              <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i2-dns-status">–</span></div>
+            </div>
+          </div>
+
+          <div class="card card-wide" id="i2-card-history">
+            <div class="card-header">
+              <span class="card-icon">&#128200;</span>
+              <h2>Status History (last 30 polls)</h2>
+            </div>
+            <div class="card-body">
+              <div id="i2-history-track" class="history-track"></div>
+              <div class="history-legend">
+                <span class="dot connected"></span> Connected &nbsp;
+                <span class="dot paused"></span> Paused &nbsp;
+                <span class="dot disconnected"></span> Disconnected &nbsp;
+                <span class="dot unknown"></span> Unknown
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.instances-container -->
   </main>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

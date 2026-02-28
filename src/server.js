@@ -5,23 +5,34 @@ const path = require('path');
 const app = express();
 app.disable('x-powered-by');
 const PORT = process.env.PORT || 3000;
-const GLUETUN_URL = process.env.GLUETUN_CONTROL_URL || 'http://gluetun:8000';
 
-// Optional auth – set GLUETUN_API_KEY for Bearer token,
-// or GLUETUN_USER + GLUETUN_PASSWORD for HTTP Basic auth.
-const GLUETUN_API_KEY    = process.env.GLUETUN_API_KEY    || '';
-const GLUETUN_USER       = process.env.GLUETUN_USER       || '';
-const GLUETUN_PASSWORD   = process.env.GLUETUN_PASSWORD   || '';
+// Multi-instance configuration.
+// Falls back to legacy GLUETUN_CONTROL_URL / GLUETUN_API_KEY for instance 1.
+const INSTANCES = {
+  '1': {
+    name:   process.env.GLUETUN_1_NAME    || 'Gluetun 1',
+    url:    process.env.GLUETUN_1_URL     || process.env.GLUETUN_CONTROL_URL || '',
+    apiKey: process.env.GLUETUN_1_API_KEY || process.env.GLUETUN_API_KEY     || '',
+  },
+  '2': {
+    name:   process.env.GLUETUN_2_NAME    || 'Gluetun 2',
+    url:    process.env.GLUETUN_2_URL     || '',
+    apiKey: process.env.GLUETUN_2_API_KEY || '',
+  },
+};
 
-function buildAuthHeaders() {
-  if (GLUETUN_API_KEY) {
-    return { 'X-API-Key': GLUETUN_API_KEY };
+function resolveInstance(req, res) {
+  const id = req.query.instance;
+  if (!id || !Object.prototype.hasOwnProperty.call(INSTANCES, id)) {
+    res.status(400).json({ ok: false, error: 'Missing or invalid instance parameter. Use ?instance=1 or ?instance=2.' });
+    return null;
   }
-  if (GLUETUN_USER && GLUETUN_PASSWORD) {
-    const encoded = Buffer.from(`${GLUETUN_USER}:${GLUETUN_PASSWORD}`).toString('base64');
-    return { Authorization: `Basic ${encoded}` };
+  const inst = INSTANCES[id];
+  if (!inst.url) {
+    res.status(503).json({ ok: false, error: 'Instance not configured' });
+    return null;
   }
-  return {};
+  return inst;
 }
 
 // General read rate limiter (covers all /api/* GET routes)
@@ -58,8 +69,8 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '2kb' }));
 app.use(uiLimiter, express.static(path.join(__dirname, 'public')));
 
-async function gluetunFetch(endpoint, method = 'GET', body = null) {
-  const url = `${GLUETUN_URL}${endpoint}`;
+async function gluetunFetch(endpoint, method = 'GET', body = null, baseUrl = '', apiKey = '') {
+  const url = `${baseUrl}${endpoint}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
   const opts = {
@@ -68,7 +79,7 @@ async function gluetunFetch(endpoint, method = 'GET', body = null) {
     redirect: 'error',
     headers: {
       ...(body !== null ? { 'Content-Type': 'application/json' } : {}),
-      ...buildAuthHeaders(),
+      ...(apiKey ? { 'X-API-Key': apiKey } : {}),
     },
   };
   if (body !== null) opts.body = JSON.stringify(body);
@@ -84,11 +95,24 @@ async function gluetunFetch(endpoint, method = 'GET', body = null) {
   }
 }
 
+// --- Instance list ---
+
+app.get('/api/instances', (req, res) => {
+  const list = Object.entries(INSTANCES).map(([id, inst]) => ({
+    id,
+    name: inst.name,
+    configured: Boolean(inst.url),
+  }));
+  res.json({ ok: true, data: list });
+});
+
 // --- Proxy endpoints ---
 
 app.get('/api/status', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/vpn/status');
+    const data = await gluetunFetch('/v1/vpn/status', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -97,8 +121,10 @@ app.get('/api/status', async (req, res) => {
 });
 
 app.get('/api/publicip', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/publicip/ip');
+    const data = await gluetunFetch('/v1/publicip/ip', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -107,8 +133,10 @@ app.get('/api/publicip', async (req, res) => {
 });
 
 app.get('/api/portforwarded', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/portforward');
+    const data = await gluetunFetch('/v1/portforward', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -117,8 +145,10 @@ app.get('/api/portforwarded', async (req, res) => {
 });
 
 app.get('/api/settings', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/vpn/settings');
+    const data = await gluetunFetch('/v1/vpn/settings', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -127,8 +157,10 @@ app.get('/api/settings', async (req, res) => {
 });
 
 app.get('/api/dns', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
-    const data = await gluetunFetch('/v1/dns/status');
+    const data = await gluetunFetch('/v1/dns/status', 'GET', null, inst.url, inst.apiKey);
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
@@ -138,12 +170,14 @@ app.get('/api/dns', async (req, res) => {
 
 // Aggregate health snapshot
 app.get('/api/health', async (req, res) => {
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   const results = await Promise.allSettled([
-    gluetunFetch('/v1/vpn/status'),
-    gluetunFetch('/v1/publicip/ip'),
-    gluetunFetch('/v1/portforward'),
-    gluetunFetch('/v1/dns/status'),
-    gluetunFetch('/v1/vpn/settings'),
+    gluetunFetch('/v1/vpn/status',   'GET', null, inst.url, inst.apiKey),
+    gluetunFetch('/v1/publicip/ip',  'GET', null, inst.url, inst.apiKey),
+    gluetunFetch('/v1/portforward',  'GET', null, inst.url, inst.apiKey),
+    gluetunFetch('/v1/dns/status',   'GET', null, inst.url, inst.apiKey),
+    gluetunFetch('/v1/vpn/settings', 'GET', null, inst.url, inst.apiKey),
   ]);
 
   results.forEach(r => { if (r.status === 'rejected') console.error('[upstream]', r.reason?.message); });
@@ -185,11 +219,15 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
   if (!allowed.includes(action)) {
     return res.status(400).json({ ok: false, error: 'Invalid action. Use start or stop.' });
   }
+  const inst = resolveInstance(req, res);
+  if (!inst) return;
   try {
     const data = await gluetunFetch(
       '/v1/vpn/status',
       'PUT',
-      { status: action === 'start' ? 'running' : 'stopped' }
+      { status: action === 'start' ? 'running' : 'stopped' },
+      inst.url,
+      inst.apiKey,
     );
     res.json({ ok: true, data });
   } catch (err) {
@@ -214,5 +252,11 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Gluetun Web UI running on port ${PORT}`);
-  console.log(`Proxying to Gluetun at: ${GLUETUN_URL}`);
+  Object.entries(INSTANCES).forEach(([id, inst]) => {
+    if (inst.url) {
+      console.log(`Instance ${id} (${inst.name}): ${inst.url}`);
+    } else {
+      console.log(`Instance ${id} (${inst.name}): not configured`);
+    }
+  });
 });
