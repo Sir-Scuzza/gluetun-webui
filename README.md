@@ -76,9 +76,19 @@ In the `services:` block, add:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
+      # ── Single Gluetun instance (legacy, still supported) ────────────────
       - GLUETUN_CONTROL_URL=http://gluetun:8000   # service name of your gluetun container
       # Optional — only needed if Gluetun has auth enabled:
       #- GLUETUN_API_KEY=yourtoken
+
+      # ── Two Gluetun instances (recommended when you run two containers) ──
+      # Comment the legacy variables above and uncomment these instead:
+      #- GLUETUN_1_NAME=Gluetun 1
+      #- GLUETUN_1_URL=http://gluetun-1:8000
+      #- GLUETUN_1_API_KEY=token_for_instance_1
+      #- GLUETUN_2_NAME=Gluetun 2
+      #- GLUETUN_2_URL=http://gluetun-2:8000
+      #- GLUETUN_2_API_KEY=token_for_instance_2
     networks:
       - your_gluetun_network     # must be the same network as your gluetun service
     restart: unless-stopped
@@ -136,8 +146,10 @@ services:
     environment:
       - GLUETUN_1_NAME=Gluetun FR
       - GLUETUN_1_URL=http://gluetun-fr:8000
+      #- GLUETUN_1_API_KEY=token_for_instance_1   # only if Gluetun has API key auth enabled
       - GLUETUN_2_NAME=Gluetun US
       - GLUETUN_2_URL=http://gluetun-us:8000
+      #- GLUETUN_2_API_KEY=token_for_instance_2   # only if Gluetun has API key auth enabled
     networks:
       - arr-stack
     restart: unless-stopped
