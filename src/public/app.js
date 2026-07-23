@@ -332,11 +332,26 @@ function saveInterval() {
 
 // Restore saved polling interval
 const savedInterval = localStorage.getItem(STORAGE_INTERVAL_KEY);
+let intervalValue = null;
 if (savedInterval !== null) {
     const parsed = parseInt(savedInterval, 10);
     if (!isNaN(parsed) && [0, 5000, 10000, 30000, 60000].includes(parsed)) {
-        $('refresh-interval').value = parsed;
+        intervalValue = parsed;
     }
+}
+// If no valid saved value, try the meta tag for default from environment
+if (intervalValue === null) {
+    const meta = document.getElementById('default-poll-interval');
+    if (meta && meta.content) {
+        const metaValue = parseInt(meta.content, 10);
+        if (!isNaN(metaValue) && [0, 5000, 10000, 30000, 60000].includes(metaValue)) {
+            intervalValue = metaValue;
+        }
+    }
+}
+// Apply the value if found
+if (intervalValue !== null) {
+    $('refresh-interval').value = intervalValue;
 }
 
 $('refresh-btn').addEventListener('click', () => {

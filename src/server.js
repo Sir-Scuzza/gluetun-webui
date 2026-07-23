@@ -310,7 +310,11 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
 app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));
 
 app.get('*', staticLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const filePath = path.join(__dirname, 'public', 'index.html');
+  let html = fs.readFileSync(filePath, 'utf8');
+  const defaultInterval = process.env.DEFAULT_POLL_INTERVAL || '';
+  html = html.replace('{{DEFAULT_POLL_INTERVAL}}', defaultInterval);
+  res.send(html);
 });
 
 // Global error handler – catches synchronous throws and next(err) calls
