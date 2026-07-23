@@ -2,6 +2,7 @@
 
 const MAX_HISTORY = 30;
 const VALID_STATES = new Set(['connected', 'paused', 'disconnected', 'unknown']);
+const STORAGE_INTERVAL_KEY = 'gluetun-poll-interval';
 
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
@@ -321,21 +322,56 @@ function applyAutoRefresh() {
 
 // ---- Init ----
 
+function saveInterval() {
+    const select = $('refresh-interval');
+    const value = parseInt(select.value, 10);
+    if (!isNaN(value)) {
+        localStorage.setItem(STORAGE_INTERVAL_KEY, value);
+    }
+}
+
+// Restore saved polling interval
+const savedInterval = localStorage.getItem(STORAGE_INTERVAL_KEY);
+let intervalValue = null;
+if (savedInterval !== null) {
+    const parsed = parseInt(savedInterval, 10);
+    if (!isNaN(parsed) && [0, 5000, 10000, 30000, 60000].includes(parsed)) {
+        intervalValue = parsed;
+    }
+}
+// If no valid saved value, try the meta tag for default from environment
+if (intervalValue === null) {
+    const meta = document.getElementById('default-poll-interval');
+    if (meta && meta.content) {
+        const metaValue = parseInt(meta.content, 10);
+        if (!isNaN(metaValue) && [0, 5000, 10000, 30000, 60000].includes(metaValue)) {
+            intervalValue = metaValue;
+        }
+    }
+}
+// Apply the value if found
+if (intervalValue !== null) {
+    $('refresh-interval').value = intervalValue;
+}
+
 $('refresh-btn').addEventListener('click', () => {
-  clearTimeout(refreshTimer);
-  pollAll().then(() => scheduleNextPoll());
+    clearTimeout(refreshTimer);
+    pollAll().then(() => scheduleNextPoll());
 });
-$('refresh-interval').addEventListener('change', applyAutoRefresh);
+$('refresh-interval').addEventListener('change', () => {
+    saveInterval();
+    applyAutoRefresh();
+});
 
 (async () => {
-  try {
-    const res = await fetch('/api/instances');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    instances = await res.json();
-  } catch (_) {
-    instances = [{ id: '1', name: 'Gluetun' }];
-  }
-  renderAllDashboards();
-  await pollAll();
-  scheduleNextPoll();
+    try {
+        const res = await fetch('/api/instances');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        instances = await res.json();
+    } catch (_) {
+        instances = [{ id: '1', name: 'Gluetun' }];
+    }
+    renderAllDashboards();
+    await pollAll();
+    scheduleNextPoll();
 })();

@@ -51,6 +51,7 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 - Auto-refresh with configurable interval (5s – 60s)
 - Last 30 poll ticks colour-coded in history bar
 - Responsive design (mobile, tablet, desktop)
+- Persistent polling interval selection (via localStorage)
 
 ---
 
@@ -262,6 +263,7 @@ Each instance can have different authentication:
 | `GLUETUN_API_KEY` | _(empty)_ | **Legacy** – Bearer token for single instance |
 | `GLUETUN_USER` | _(empty)_ | **Legacy** – Username for HTTP Basic auth |
 | `GLUETUN_PASSWORD` | _(empty)_ | **Legacy** – Password for HTTP Basic auth |
+| `DEFAULT_POLL_INTERVAL` | _(empty)_ | Default polling interval in milliseconds (e.g., 10000 for 10s). If set, used when no saved preference exists in localStorage. Must be one of: 0, 5000, 10000, 30000, 60000. |
 | `PORT` | `3000` | Port the web UI listens on |
 | `TRUST_PROXY` | `false` | Set to `true` if running behind a reverse proxy (nginx, Traefik, etc.) |
 

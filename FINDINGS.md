@@ -159,6 +159,17 @@ _No open bugs._
 - **Backward compatibility** confirmed — legacy `GLUETUN_CONTROL_URL` env var still triggers single-instance mode when no numbered variables are detected.
 - **Code Review**: Comprehensive full-stack review completed. Overall assessment: **8-9/10 across all areas**. No critical security issues discovered. All existing open findings (S-03, S-05–S-08, C-01–C-06, D-01) confirmed unchanged.
 
+### Issue #17 fixed: Polling interval persistence
+
+- Added `localStorage` persistence for the polling interval selector. The selected interval (Off/5s/10s/30s/60s) is saved and restored on page load, so the user's preference persists across reloads.
+- Changed the change listener to save the selected value before reapplying the timeout.
+- Added constant `STORAGE_INTERVAL_KEY` for the storage key.
+
+### Environment variable for default polling interval
+- Added `DEFAULT_POLL_INTERVAL` environment variable to set a default polling interval (in milliseconds) when no saved value is found in localStorage.
+- The value must be one of: 0 (off), 5000, 10000, 30000, 60000.
+- The server injects this value into the index.html meta tag `<meta id="default-poll-interval">` which the frontend reads on startup.
+
 ---
 
 ## Recent Updates (2026-02-25 — pass 2)
