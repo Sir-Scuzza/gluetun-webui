@@ -197,3 +197,14 @@ _No open bugs._
 - **D-02 (NEW)**: docker-compose.example.yml has a network key mismatch — the service references the Docker network name instead of the Compose key, silently creating the wrong network.
 - **D-03 / D-04 (Regressions)**: F-03 (`npm ci`) and F-12 (image digest pinning) were previously marked fixed but have regressed. `package-lock.json` was never committed, and the Dockerfile still uses a mutable tag.
 - All previously open findings (S-01 through S-08, C-01 through C-06, D-01) confirmed still present.
+
+### Issue #18 fixed: Ability to change VPN server
+
+- Added a "Change" button next to the server display in the VPN details card for each instance.
+- Clicking the button prompts the user to enter a new server hostname or IP address.
+- The new server is sent to the Gluetun instance via the `/api/:instanceId/settings` endpoint (PUT), updating the `ServerSelection.Hostnames` field to the new hostname and clearing the `Names` field.
+- The change takes effect after the VPN reconnects (visible on the next health poll).
+- This feature works for both single-instance and multi-instance configurations.
+- Note: The user must know the hostname or IP address of the desired server. To change server by country, city, etc., users can modify the corresponding settings via the `/api/:instanceId/settings` endpoint (not yet exposed in the UI).
+
+---

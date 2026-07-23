@@ -51,6 +51,8 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 - Auto-refresh with configurable interval (5s – 60s)
 - Last 30 poll ticks colour-coded in history bar
 - Responsive design (mobile, tablet, desktop)
+- Ability to change VPN server (hostname/IP) via UI
+- Persistent polling interval selection (via localStorage)
 
 ---
 

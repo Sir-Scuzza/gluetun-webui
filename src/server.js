@@ -234,6 +234,35 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
+app.get('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(instance, '/v1/vpn/settings');
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+app.put('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(
+      instance,
+      '/v1/vpn/settings',
+      'PUT',
+      req.body
+    );
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
 app.get('/api/dns', async (req, res) => {
   try {
     const data = await gluetunFetch(instances[0], '/v1/dns/status');
