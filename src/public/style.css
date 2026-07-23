@@ -233,6 +233,9 @@ main {
 .dot.paused       { background: var(--yellow); }
 .dot.disconnected { background: var(--red); }
 .dot.unknown      { background: var(--muted); }
+.dot.latency-good { background: var(--green); }
+.dot.latency-warn { background: var(--yellow); }
+.dot.latency-bad  { background: var(--red); }
 
 /* ---- Instance tabs ---- */
 .instance-tabs {

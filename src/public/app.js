@@ -2,10 +2,15 @@
 
 const MAX_HISTORY = 30;
 const VALID_STATES = new Set(['connected', 'paused', 'disconnected', 'unknown']);
+const LATENCY_GOOD_MS = 150;
+const LATENCY_WARN_MS = 400;
+const MAX_LATENCY_DISPLAY_MS = 800;
 
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
 let refreshTimer = null;
+const instanceSettings = new Map(); // id -> settings object (from /api/:instanceId/health vpnSettings.data)
+const latencyHistory   = new Map(); // id -> number[] (ms, newest last)
 
 // ---- Utility ----
 
@@ -56,6 +61,64 @@ function renderHistoryFor(id) {
     tick.title = `Poll #${i + 1}: ${s}`;
     track.appendChild(tick);
   });
+}
+
+function pushLatencyFor(id, ms) {
+  const hist = latencyHistory.get(id) || [];
+  hist.push(ms);
+  if (hist.length > MAX_HISTORY) hist.shift();
+  latencyHistory.set(id, hist);
+  try { localStorage.setItem(`gluetun_latency_${id}`, JSON.stringify(hist)); } catch (_) {}
+}
+
+function loadLatencyFor(id) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(`gluetun_latency_${id}`));
+    return Array.isArray(raw) ? raw.slice(0, MAX_HISTORY) : [];
+  } catch (_) { return []; }
+}
+
+function latencyColor(ms) {
+  if (ms === null || ms === undefined) return 'var(--muted)';
+  if (ms < LATENCY_GOOD_MS)  return 'var(--green)';
+  if (ms < LATENCY_WARN_MS)  return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function renderLatencyChartFor(id) {
+  const container = document.getElementById(`i${id}-latency-chart`);
+  if (!container) return;
+  const hist = latencyHistory.get(id) || [];
+  if (hist.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const W = container.clientWidth || 600;
+  const H = 64;
+  const BAR_GAP = 2;
+  const barW = Math.max(2, Math.floor((W - BAR_GAP) / MAX_HISTORY) - BAR_GAP);
+  const cols = Math.floor((W + BAR_GAP) / (barW + BAR_GAP));
+  const slice = hist.slice(-cols);
+  const svgW = slice.length * (barW + BAR_GAP);
+
+  const bars = slice.map((ms, i) => {
+    const height = ms === null
+      ? 4
+      : Math.max(4, Math.round((ms / MAX_LATENCY_DISPLAY_MS) * H));
+    const y = H - height;
+    const color = latencyColor(ms);
+    return `<rect x="${i * (barW + BAR_GAP)}" y="${y}" width="${barW}" height="${height}" rx="2" fill="${color}" opacity="0.85" />`;
+  }).join('');
+
+  container.innerHTML = `<svg width="${svgW}" height="${H}" style="display:block">${bars}</svg>`;
+
+  const latest = hist[hist.length - 1];
+  const statEl = document.getElementById(`i${id}-latency-stat`);
+  if (statEl) {
+    statEl.textContent = latest === null ? '–' : `${latest}ms`;
+    statEl.style.color = latencyColor(latest);
+  }
 }
 
 // ---- Dashboard group builder (old layout per instance) ----
@@ -148,6 +211,25 @@ function buildDashboardGroup(inst) {
           </div>
         </div>
       </div>
+    <!-- Latency card -->
+      <div class="card card-wide">
+        <div class="card-header">
+          <span class="card-icon">&#9889;</span>
+          <h3>Latency (last 30 polls)</h3>
+          <span id="i${id}-latency-stat" class="stat-value" style="margin-left:auto;font-size:0.9rem">–</span>
+        </div>
+        <div class="card-body">
+          <div class="latency-chart-wrapper">
+            <div class="latency-chart" id="i${id}-latency-chart"></div>
+          </div>
+          <div class="history-legend">
+            <span class="dot latency-good"></span> <150ms &nbsp;
+            <span class="dot latency-warn"></span> 150–400ms &nbsp;
+            <span class="dot latency-bad"></span> >400ms &nbsp;
+            <span class="dot unknown"></span> Failed
+          </div>
+        </div>
+      </div>
     </div>
   `;
   group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
@@ -161,6 +243,7 @@ function renderAllDashboards() {
   instances.forEach(inst => {
     container.appendChild(buildDashboardGroup(inst));
     renderHistoryFor(inst.id);
+    renderLatencyChartFor(inst.id);
   });
   // Set grid columns: 1=full, 2=half, 3=third, 4=quarter
   const cols = Math.min(instances.length, 4) || 1;
@@ -267,10 +350,16 @@ async function pollAll() {
 
   await Promise.allSettled(instances.map(async inst => {
     try {
+      const t0 = performance.now();
       const health = await fetchHealth(inst.id);
+      const latencyMs = Math.round(performance.now() - t0);
+      pushLatencyFor(inst.id, latencyMs);
       updatePanel(inst, health);
+      renderLatencyChartFor(inst.id);
     } catch (_) {
+      pushLatencyFor(inst.id, null);
       updatePanelError(inst);
+      renderLatencyChartFor(inst.id);
     }
   }));
 
@@ -335,6 +424,10 @@ $('refresh-interval').addEventListener('change', applyAutoRefresh);
   } catch (_) {
     instances = [{ id: '1', name: 'Gluetun' }];
   }
+  instances.forEach(inst => {
+    const hist = loadLatencyFor(inst.id);
+    if (hist.length > 0) latencyHistory.set(inst.id, hist);
+  });
   renderAllDashboards();
   await pollAll();
   scheduleNextPoll();
