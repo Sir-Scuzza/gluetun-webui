@@ -28,6 +28,14 @@ function showToast(msg, type = 'info', duration = 3500) {
   t._timer = setTimeout(() => { t.className = 'toast hidden'; }, duration);
 }
 
+function isIPv6(ip) {
+  return ip && ip.includes(':');
+}
+
+function ipTypeLabel(ip) {
+  return isIPv6(ip) ? 'IPv6' : 'IPv4';
+}
+
 // ---- Per-instance session history ----
 
 function sessionKey(id) { return `gluetun_history_${id}`; }
@@ -88,7 +96,14 @@ function buildDashboardGroup(inst) {
           <h3>${escHtml(inst.name)}</h3>
         </div>
         <div class="card-body">
-          <div class="stat-row"><span class="stat-label">Public IP</span><span class="stat-value mono" id="i${id}-ip-address">–</span></div>
+          <div class="stat-row">
+            <span class="stat-label" id="i${id}-ip-primary-label">Public IP</span>
+            <span class="stat-value mono" id="i${id}-ip-address">–</span>
+          </div>
+          <div class="stat-row secondary-ip-row" style="display:none">
+            <span class="stat-label" id="i${id}-ip-secondary-label">Secondary IP</span>
+            <span class="stat-value mono" id="i${id}-ip-secondary">–</span>
+          </div>
           <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i${id}-ip-country">–</span></div>
           <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i${id}-ip-city">–</span></div>
           <div class="stat-row"><span class="stat-label">Organisation</span><span class="stat-value" id="i${id}-ip-org">–</span></div>
@@ -185,7 +200,7 @@ function updatePanel(inst, health) {
 
   const d  = vpnStatus?.ok   ? vpnStatus.data   : null;
   const s  = vpnSettings?.ok ? vpnSettings.data  : null;
-  const ip = publicIp?.ok    ? publicIp.data     : null;
+  const ip = publicIp?.ok     ? publicIp.data     : null;
 
   const running = d?.status === 'running';
   const stopped = d?.status === 'stopped';
@@ -197,21 +212,60 @@ function updatePanel(inst, health) {
   const banner = document.getElementById(`i${id}-banner`);
   if (banner) banner.className = `status-banner ${state}`;
 
-  const pubIpStr = ip?.public_ip ?? ip?.ip ?? '';
+  const primaryIp  = ip?.public_ip ?? ip?.ip ?? '';
+  const secondaryIp = inst.secondaryPublicIp || '';
+  const displayMode = inst.ipDisplayMode || 'auto';
+
+  const useDualDisplay = (displayMode === 'auto' && secondaryIp) ||
+                          displayMode === 'dual';
+
+  const primaryType   = ipTypeLabel(primaryIp);
+  const secondaryType = secondaryIp ? (isIPv6(secondaryIp) ? 'IPv6' : 'IPv4') : '';
+
+  const primaryLabel   = useDualDisplay ? primaryType   : 'Public IP';
+  const secondaryLabel  = useDualDisplay ? secondaryType  : 'Secondary IP';
+  const secondaryEl     = document.getElementById(`i${id}-ip-secondary`);
+  const secondaryRow    = secondaryEl ? secondaryEl.closest('.stat-row') : null;
+
+  setEl(`i${id}-ip-primary-label`,   primaryLabel);
+  setEl(`i${id}-ip-address`,         primaryIp || '–');
+  setEl(`i${id}-ip-secondary-label`,  secondaryLabel);
+
+  if (useDualDisplay) {
+    if (secondaryIp) {
+      setEl(`i${id}-ip-secondary`, secondaryIp);
+      if (secondaryRow) secondaryRow.style.display = '';
+    } else {
+      setEl(`i${id}-ip-secondary`, '–');
+      if (secondaryRow) secondaryRow.style.display = '';
+    }
+  } else if (secondaryIp && !primaryIp) {
+    setEl(`i${id}-ip-address`, secondaryIp);
+    setEl(`i${id}-ip-secondary`, '–');
+    if (secondaryRow) secondaryRow.style.display = 'none';
+  } else if (primaryIp && secondaryIp) {
+    setEl(`i${id}-ip-secondary`, secondaryIp);
+    if (secondaryRow) secondaryRow.style.display = '';
+  } else {
+    setEl(`i${id}-ip-secondary`, '–');
+    if (secondaryRow) secondaryRow.style.display = 'none';
+  }
+
+  const pubIpStr = primaryIp || '';
   let sub = '';
   if      (state === 'connected')    sub = pubIpStr ? `Public IP: ${pubIpStr}` : 'Tunnel is up';
   else if (state === 'paused')       sub = pubIpStr ? `Gluetun active – exit IP: ${pubIpStr}` : 'Gluetun active – VPN process stopped';
   else if (state === 'disconnected') sub = 'Tunnel is down – traffic may be unprotected';
   else                               sub = 'Could not reach Gluetun control API';
-  
-  const title = state === 'connected' ? 'VPN Connected' 
+  if (secondaryIp) sub += ` · ${secondaryIp}`;
+
+  const title = state === 'connected' ? 'VPN Connected'
     : state === 'paused' ? 'VPN Paused'
     : state === 'disconnected' ? 'VPN Disconnected'
     : 'Status Unknown';
   setEl(`i${id}-banner-title`, title);
   setEl(`i${id}-banner-sub`, sub);
 
-  setEl(`i${id}-ip-address`, ip?.public_ip ?? ip?.ip ?? ip?.IP ?? '–');
   setEl(`i${id}-ip-country`, ip?.country ?? '–');
   setEl(`i${id}-ip-city`, ip?.city ?? '–');
   setEl(`i${id}-ip-org`, ip?.org ?? ip?.organization ?? '–');

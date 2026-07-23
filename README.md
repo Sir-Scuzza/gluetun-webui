@@ -1,4 +1,3 @@
-
 <div align="right">
   <details>
     <summary >🌐 Language</summary>
@@ -44,7 +43,7 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 
 - ✨ **Multi-VPN Support** — Monitor & control up to 20 Gluetun instances simultaneously
 - Live VPN status banner (connected / paused / disconnected)
-- Public exit IP, country, region, city, and organisation
+- Public exit IP (IPv4 and/or IPv6, stacked when both available via `GLUETUN_*_SECONDARY_PUBLIC_IP`)
 - VPN provider, protocol (WireGuard / OpenVPN), server details
 - Port forwarding and DNS status
 - Start / Stop VPN controls
@@ -53,6 +52,7 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 - Responsive design (mobile, tablet, desktop)
 - Ability to change VPN server (hostname/IP) via UI
 - Persistent polling interval selection (via localStorage)
+- IPv6 address support (displays IPv6 addresses correctly)
 
 ---
 
@@ -121,11 +121,11 @@ gluetun-webui:
     - GLUETUN_1_NAME=VPN - London
     - GLUETUN_1_URL=http://gluetun-1:8000
     - GLUETUN_1_API_KEY=token1
-    
-    - GLUETUN_2_NAME=VPN - Amsterdam  
+
+    - GLUETUN_2_NAME=VPN - Amsterdam
     - GLUETUN_2_URL=http://gluetun-2:8000
     - GLUETUN_2_API_KEY=token2
-    
+
     - GLUETUN_3_NAME=VPN - Singapore
     - GLUETUN_3_URL=http://gluetun-3:8000
     - GLUETUN_3_API_KEY=token3
@@ -240,7 +240,7 @@ Each instance can have different authentication:
 # Instance with API key
 - GLUETUN_1_API_KEY=my-secret-token
 
-# Instance with HTTP Basic auth
+# Instance with HTTP Auth
 - GLUETUN_2_USER=admin
 - GLUETUN_2_PASSWORD=mysecret
 
@@ -260,6 +260,8 @@ Each instance can have different authentication:
 | `GLUETUN_{N}_API_KEY` | _(empty)_ | Bearer token for instance N (if auth enabled) |
 | `GLUETUN_{N}_USER` | _(empty)_ | Username for HTTP Basic auth (instance N) |
 | `GLUETUN_{N}_PASSWORD` | _(empty)_ | Password for HTTP Basic auth (instance N) |
+| `GLUETUN_{N}_IP_DISPLAY_MODE` | `auto` | Display mode for public IP (`auto`, `dual`). In `auto` mode with `GLUETUN_{N}_SECONDARY_PUBLIC_IP` set, both IPs are shown stacked with IPv4/IPv6 labels |
+| `GLUETUN_{N}_SECONDARY_PUBLIC_IP` | _(empty)_ | Secondary public IP address (e.g. IPv6 if Gluetun reports IPv4). When set alongside `IP_DISPLAY_MODE=auto`, both IPs display stacked |
 | `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | **Legacy** – single instance only (fallback if no `GLUETUN_1_*` vars) |
 | `GLUETUN_API_KEY` | _(empty)_ | **Legacy** – Bearer token for single instance |
 | `GLUETUN_USER` | _(empty)_ | **Legacy** – Username for HTTP Basic auth |
