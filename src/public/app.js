@@ -6,7 +6,6 @@ const VALID_STATES = new Set(['connected', 'paused', 'disconnected', 'unknown'])
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
 let refreshTimer = null;
-const instanceSettings = new Map(); // id -> settings object (from /api/:instanceId/health vpnSettings.data)
 
 // ---- Utility ----
 
@@ -110,21 +109,21 @@ function buildDashboardGroup(inst) {
         </div>
       </div>
 
-<!-- VPN details card -->
-       <div class="card">
-         <div class="card-header">
-           <span class="card-icon">&#128274;</span>
-           <h3>VPN Connection</h3>
-         </div>
-         <div class="card-body">
-           <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i${id}-vpn-status">–</span></div>
-           <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i${id}-vpn-provider">–</span></div>
-           <div class="stat-row"><span class="stat-label">Server</span><div id="i${id}-server-container" class="server-input-container"><span class="stat-value mono" id="i${id}-vpn-server">–</span><button id="i${id}-change-server-btn" class="btn-small">Change</button></div></div>
-           <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i${id}-vpn-protocol">–</span></div>
-           <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i${id}-vpn-country">–</span></div>
-           <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i${id}-vpn-city">–</span></div>
-         </div>
-       </div>
+      <!-- VPN details card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">&#128274;</span>
+          <h3>VPN Connection</h3>
+        </div>
+        <div class="card-body">
+          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i${id}-vpn-status">–</span></div>
+          <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i${id}-vpn-provider">–</span></div>
+          <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="i${id}-vpn-server">–</span></div>
+          <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i${id}-vpn-protocol">–</span></div>
+          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i${id}-vpn-country">–</span></div>
+          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i${id}-vpn-city">–</span></div>
+        </div>
+      </div>
 
       <!-- Port forwarding card -->
       <div class="card">
@@ -166,18 +165,9 @@ function buildDashboardGroup(inst) {
       </div>
     </div>
   `;
-group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
-   group.querySelector(`#i${id}-btn-stop`).addEventListener('click', () => vpnAction(id, 'stop'));
-   const changeServerBtn = group.querySelector(`#i${id}-change-server-btn`);
-   changeServerBtn.addEventListener('click', () => {
-        const serverEl = group.querySelector(`#i${id}-vpn-server`);
-        const currentServer = serverEl.textContent.trim();
-        const newServer = prompt('Enter new server hostname or IP:', currentServer === '–' ? '' : currentServer);
-        if (newServer !== null && newServer.trim() !== '') {
-            updateServerForInstance(id, newServer.trim());
-        }
-   });
-   return group;
+  group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
+  group.querySelector(`#i${id}-btn-stop`).addEventListener('click', () => vpnAction(id, 'stop'));
+  return group;
 }
 
 function renderAllDashboards() {
@@ -200,7 +190,7 @@ function updatePanel(inst, health) {
 
   const d  = vpnStatus?.ok   ? vpnStatus.data   : null;
   const s  = vpnSettings?.ok ? vpnSettings.data  : null;
-  const ip = publicIp?.ok     ? publicIp.data     : null;
+  const ip = publicIp?.ok    ? publicIp.data     : null;
 
   const running = d?.status === 'running';
   const stopped = d?.status === 'stopped';
@@ -212,24 +202,25 @@ function updatePanel(inst, health) {
   const banner = document.getElementById(`i${id}-banner`);
   if (banner) banner.className = `status-banner ${state}`;
 
-  const primaryIp  = ip?.public_ip ?? ip?.ip ?? '';
-  const secondaryIp = inst.secondaryPublicIp || '';
+  const primaryIp   = ip?.public_ip ?? ip?.ip ?? '';
+  const autoIpv6    = health.publicIpv6?.ok ? health.publicIpv6.data?.ipv6 : null;
+  const secondaryIp = autoIpv6 || inst.secondaryPublicIp || '';
   const displayMode = inst.ipDisplayMode || 'auto';
 
   const useDualDisplay = (displayMode === 'auto' && secondaryIp) ||
                           displayMode === 'dual';
 
   const primaryType   = ipTypeLabel(primaryIp);
-  const secondaryType = secondaryIp ? (isIPv6(secondaryIp) ? 'IPv6' : 'IPv4') : '';
+  const secondaryType = secondaryIp ? ipTypeLabel(secondaryIp) : '';
 
-  const primaryLabel   = useDualDisplay ? primaryType   : 'Public IP';
-  const secondaryLabel  = useDualDisplay ? secondaryType  : 'Secondary IP';
-  const secondaryEl     = document.getElementById(`i${id}-ip-secondary`);
-  const secondaryRow    = secondaryEl ? secondaryEl.closest('.stat-row') : null;
+  const primaryLabel  = useDualDisplay ? primaryType   : 'Public IP';
+  const secondaryLabel = useDualDisplay ? secondaryType : 'Secondary IP';
+  const secondaryEl    = document.getElementById(`i${id}-ip-secondary`);
+  const secondaryRow   = secondaryEl ? secondaryEl.closest('.stat-row') : null;
 
   setEl(`i${id}-ip-primary-label`,   primaryLabel);
   setEl(`i${id}-ip-address`,         primaryIp || '–');
-  setEl(`i${id}-ip-secondary-label`,  secondaryLabel);
+  setEl(`i${id}-ip-secondary-label`, secondaryLabel);
 
   if (useDualDisplay) {
     if (secondaryIp) {
@@ -241,13 +232,11 @@ function updatePanel(inst, health) {
     }
   } else if (secondaryIp && !primaryIp) {
     setEl(`i${id}-ip-address`, secondaryIp);
-    setEl(`i${id}-ip-secondary`, '–');
     if (secondaryRow) secondaryRow.style.display = 'none';
   } else if (primaryIp && secondaryIp) {
     setEl(`i${id}-ip-secondary`, secondaryIp);
     if (secondaryRow) secondaryRow.style.display = '';
   } else {
-    setEl(`i${id}-ip-secondary`, '–');
     if (secondaryRow) secondaryRow.style.display = 'none';
   }
 
@@ -284,88 +273,35 @@ function updatePanel(inst, health) {
   const port = portForwarded?.ok ? (portForwarded.data?.port ?? 0) : 0;
   setEl(`i${id}-port-number`, port > 0 ? String(port) : portForwarded?.ok ? 'Not forwarded' : 'N/A');
 
-setEl(`i${id}-dns-status`, dnsStatus?.ok ? (dnsStatus.data?.status ?? 'OK') : 'Unavailable');
+  setEl(`i${id}-dns-status`, dnsStatus?.ok ? (dnsStatus.data?.status ?? 'OK') : 'Unavailable');
 
-   // Store the VPN settings for later use in server changes
-   if (s) {
-        instanceSettings.set(id, s);
-   } else {
-        instanceSettings.delete(id);
-   }
-
-   pushHistoryFor(id, state);
-   renderHistoryFor(id);
+  pushHistoryFor(id, state);
+  renderHistoryFor(id);
 }
 
 function updatePanelError(inst) {
-   const id = inst.id;
-   const banner = document.getElementById(`i${id}-banner`);
-   if (banner) banner.className = 'status-banner unknown';
-   setEl(`i${id}-banner-title`, 'Status Unknown');
-   setEl(`i${id}-banner-sub`, 'Could not reach Gluetun control API');
-   setEl(`i${id}-ip-address`, '–');
-   setEl(`i${id}-ip-country`, '–');
-   setEl(`i${id}-ip-city`, '–');
-   setEl(`i${id}-ip-org`, '–');
-   setEl(`i${id}-vpn-status`, '–');
-   setEl(`i${id}-vpn-provider`, '–');
-   setEl(`i${id}-vpn-server`, '–');
-   setEl(`i${id}-vpn-protocol`, '–');
-   setEl(`i${id}-vpn-country`, '–');
-   setEl(`i${id}-vpn-city`, '–');
-   setEl(`i${id}-port-number`, 'N/A');
-   setEl(`i${id}-dns-status`, 'Unavailable');
-   pushHistoryFor(id, 'unknown');
-   renderHistoryFor(id);
-   // Remove stored settings for this instance on error to avoid stale data
-   instanceSettings.delete(id);
-}
-
-// Update server for a specific instance
-async function updateServerForInstance(instanceId, newServer) {
-   const settings = instanceSettings.get(instanceId);
-   if (!settings) {
-        showToast('Unable to retrieve settings for instance', 'error');
-        return;
-   }
-   const vpn = settings.VPN;
-   if (!vpn) {
-        showToast('VPN settings not found', 'error');
-        return;
-   }
-// Create a copy of the VPN object with updated server selection
-   const updatedVPN = {
-        ...vpn,
-        Provider: {
-            ...vpn.Provider,
-            ServerSelection: {
-                ...vpn.Provider.ServerSelection,
-                Method: 'manual',
-                ServerSelection: newServer
-            }
-        }
-   };
-   try {
-        const res = await fetch(`/api/${instanceId}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updatedVPN)
-        });
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`HTTP ${res.status}: ${errorText}`);
-        }
-        showToast('Server updated successfully', 'success');
-        // Optionally, we can trigger a refresh to get the new server name from the settings
-        // But note: the server name in the UI comes from the health data, which will be updated on the next poll.
-        // We can also update the UI optimistically if we want.
-        // For now, we rely on the next poll to update the server display.
-   } catch (err) {
-        console.error('[updateServer]', err.message);
-        showToast(`Failed to update server: ${err.message}`, 'error');
-   }
+  const id = inst.id;
+  const banner = document.getElementById(`i${id}-banner`);
+  if (banner) banner.className = 'status-banner unknown';
+  setEl(`i${id}-banner-title`, 'Status Unknown');
+  setEl(`i${id}-banner-sub`, 'Could not reach Gluetun control API');
+  setEl(`i${id}-ip-address`, '–');
+  setEl(`i${id}-ip-country`, '–');
+  setEl(`i${id}-ip-city`, '–');
+  setEl(`i${id}-ip-org`, '–');
+  setEl(`i${id}-vpn-status`, '–');
+  setEl(`i${id}-vpn-provider`, '–');
+  setEl(`i${id}-vpn-server`, '–');
+  setEl(`i${id}-vpn-protocol`, '–');
+  setEl(`i${id}-vpn-country`, '–');
+  setEl(`i${id}-vpn-city`, '–');
+  setEl(`i${id}-port-number`, 'N/A');
+  setEl(`i${id}-dns-status`, 'Unavailable');
+  const secondaryEl = document.getElementById(`i${id}-ip-secondary`);
+  const secondaryRow = secondaryEl ? secondaryEl.closest('.stat-row') : null;
+  if (secondaryRow) secondaryRow.style.display = 'none';
+  pushHistoryFor(id, 'unknown');
+  renderHistoryFor(id);
 }
 
 // ---- API ----
@@ -447,61 +383,7 @@ $('refresh-btn').addEventListener('click', () => {
 });
 $('refresh-interval').addEventListener('change', applyAutoRefresh);
 
-async function updateServerForInstance(instanceId, newServer) {
-    const settings = instanceSettings.get(instanceId);
-    if (!settings) {
-        showToast('Unable to retrieve settings for instance', 'error');
-        return;
-    }
-    // We have the full settings object.
-    // We need to update the ServerSelection inside settings.VPN.Provider
-    const vpn = settings.VPN;
-    if (!vpn) {
-        showToast('VPN settings not found', 'error');
-        return;
-    }
-    // Create a copy of the ServerSelection
-    const updatedServerSelection = {
-        ...vpn.Provider.ServerSelection,
-        Hostnames: [newServer],
-        Names: [] // clear the Names field to avoid conflict
-    };
-    // Update the Provider
-    const updatedProvider = {
-        ...vpn.Provider,
-        ServerSelection: updatedServerSelection
-    };
-    // Update the VPN
-    const updatedVpn = {
-        ...vpn,
-        Provider: updatedProvider
-    };
-    // Update the settings
-    const updatedSettings = {
-        ...settings,
-        VPN: updatedVpn
-    };
-    try {
-        const res = await fetch(`/api/${instanceId}/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updatedSettings)
-        });
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
-        showToast(`Server updated for instance ${instanceId}`, 'success');
-        // Note: The server name in the UI might not update immediately until the VPN reconnects.
-        // It will be updated on the next health poll.
-    } catch (err) {
-        console.error(`[updateServer]`, err.message);
-        showToast(`Failed to update server: ${err.message}`, 'error');
-    }
-}
-
-   (async () => {
+(async () => {
   try {
     const res = await fetch('/api/instances');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
