@@ -162,6 +162,9 @@ function buildDashboardGroup(inst) {
           <div class="stat-row"><span class="stat-label">Bandwidth</span><span class="stat-value mono" id="i${id}-airvpn-bw">–</span></div>
           <div class="stat-row"><span class="stat-label">Users</span><span class="stat-value" id="i${id}-airvpn-users">–</span></div>
           <div class="stat-row"><span class="stat-label">Location</span><span class="stat-value" id="i${id}-airvpn-location">–</span></div>
+          <div class="stat-row"><span class="stat-label">Transferred</span><span class="stat-value mono" id="i${id}-airvpn-transfer">–</span></div>
+          <div class="stat-row"><span class="stat-label">Speed</span><span class="stat-value mono" id="i${id}-airvpn-speed">–</span></div>
+          <div class="stat-row"><span class="stat-label">Connected</span><span class="stat-value" id="i${id}-airvpn-connected">–</span></div>
         </div>
       </div>
     </div>
@@ -187,7 +190,7 @@ function renderAllDashboards() {
 
 function updatePanel(inst, health) {
   const id = inst.id;
-  const { vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, airVpnServer, airVpnPorts } = health;
+  const { vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, airVpnServer, airVpnUserInfo } = health;
 
   const d  = vpnStatus?.ok   ? vpnStatus.data   : null;
   const s  = vpnSettings?.ok ? vpnSettings.data  : null;
@@ -253,7 +256,7 @@ function updatePanel(inst, health) {
 }
 
 function updateAirVpnPanel(id, health) {
-  const { airVpnServer, airVpnPorts } = health;
+  const { airVpnServer, airVpnUserInfo } = health;
   const card = document.getElementById(`i${id}-airvpn-card`);
   if (!card) return;
 
@@ -274,24 +277,27 @@ function updateAirVpnPanel(id, health) {
 
   const nameBadge = document.getElementById(`i${id}-airvpn-server-name`);
   if (nameBadge) {
-    if (s.health === 'ok') {
-      nameBadge.className = 'badge ok';
-    } else {
-      nameBadge.className = 'badge warn';
-    }
+    nameBadge.className = s.health === 'ok' ? 'badge ok' : 'badge warn';
   }
 
-  if (airVpnPorts?.ok && airVpnPorts?.data) {
-    const ports = Array.isArray(airVpnPorts.data)
-      ? airVpnPorts.data
-      : (airVpnPorts.data.ports || airVpnPorts.data.forwarded_ports || []);
-    if (ports.length > 0) {
-      const portStr = ports.filter(p => typeof p === 'number' || (p && p.port))
-        .map(p => typeof p === 'number' ? p : p.port)
-        .join(', ');
-      setEl(`i${id}-port-number`, portStr || '–');
-    }
+  // Session stats from userinfo
+  const conn = airVpnUserInfo?.ok ? airVpnUserInfo.data?.connection : null;
+  if (conn) {
+    const read = conn.bytes_read || 0;
+    const write = conn.bytes_write || 0;
+    setEl(`i${id}-airvpn-transfer`, `${formatBytes(read)} ↑ / ${formatBytes(write)} ↓`);
+    const spdR = conn.speed_read || 0;
+    const spdW = conn.speed_write || 0;
+    setEl(`i${id}-airvpn-speed`, `${formatBytes(spdR)}/s ↑ / ${formatBytes(spdW)}/s ↓`);
+    setEl(`i${id}-airvpn-connected`, conn.connected_since_date || '–');
   }
+}
+
+function formatBytes(b) {
+  if (b === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(b) / Math.log(1024));
+  return `${(b / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 function updatePanelError(inst) {

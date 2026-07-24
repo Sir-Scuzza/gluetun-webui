@@ -49,6 +49,7 @@ function parseInstances() {
       ipDisplayMode:    getConfigValue(`GLUETUN_${i}_IP_DISPLAY_MODE`,    `gluetun_${i}_ip_display_mode`)    || 'auto',
       secondaryPublicIp: getConfigValue(`GLUETUN_${i}_SECONDARY_PUBLIC_IP`, `gluetun_${i}_secondary_public_ip`) || '',
       airVpnApiKey: getConfigValue(`GLUETUN_${i}_AIRVPN_API_KEY`, `gluetun_${i}_airvpn_api_key`) || sharedAirVpnApiKey,
+      forwardedPort: getConfigValue(`GLUETUN_${i}_FORWARDED_PORT`, `gluetun_${i}_forwarded_port`) || getConfigValue('FORWARDED_PORT', 'forwarded_port'),
     });
   }
   if (list.length === 0) {
@@ -71,6 +72,7 @@ function parseInstances() {
       ipDisplayMode:    getConfigValue('GLUETUN_IP_DISPLAY_MODE',    'gluetun_ip_display_mode')    || 'auto',
       secondaryPublicIp: getConfigValue('GLUETUN_SECONDARY_PUBLIC_IP', 'gluetun_secondary_public_ip') || '',
       airVpnApiKey: sharedAirVpnApiKey,
+      forwardedPort: getConfigValue('FORWARDED_PORT', 'forwarded_port'),
     });
   }
   return list;
@@ -202,44 +204,59 @@ function findAirVpnServer(servers, hostname, ips = []) {
 // Returns { timestamp, vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed }
 // allFailed = true if ALL 5 checks failed (service is completely unreachable)
 async function fetchInstanceHealth(instance) {
-  const results = await Promise.allSettled([
+  const gluetunResults = await Promise.allSettled([
     gluetunFetch(instance, '/v1/vpn/status'),
     gluetunFetch(instance, '/v1/publicip/ip'),
     gluetunFetch(instance, '/v1/portforward'),
     gluetunFetch(instance, '/v1/dns/status'),
     gluetunFetch(instance, '/v1/vpn/settings'),
-    airVpnFetch(instance.airVpnApiKey, 'status'),
   ]);
-  results.forEach(r => { if (r.status === 'rejected') console.error(`[upstream][${instance.id}]`, r.reason?.message); });
-  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, airVpnStatus] = results.map(r =>
+  gluetunResults.forEach(r => { if (r.status === 'rejected') console.error(`[upstream][${instance.id}]`, r.reason?.message); });
+  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = gluetunResults.map(r =>
     r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
   );
-  const gluetunResults = results.slice(0, 5);
   const allFailed = gluetunResults.every(r => r.status === 'rejected');
 
-  let airVpnServer = null;
-  let airVpnPorts = null;
-  if (airVpnStatus.ok && airVpnStatus.data && !airVpnStatus.data.error) {
-    const statusData = airVpnStatus.data;
-    const servers = Array.isArray(statusData.servers) ? statusData.servers : [];
-    const ipData = publicIp?.ok ? publicIp.data : null;
-    airVpnServer = findAirVpnServer(servers,
-      ipData?.hostname ?? vpnSettings?.ok ? (vpnSettings.data?.provider?.server_selection?.hostnames?.[0]) : null,
-      [ipData?.public_ip ?? ipData?.ip, ipData?.public_ipv6]);
+  // Merge env var forwarded port when Gluetun returns 0 (AirVPN doesn't write to status file)
+  if (portForwarded.ok && portForwarded.data && portForwarded.data.port === 0 && instance.forwardedPort) {
+    portForwarded.data.port = Number(instance.forwardedPort);
+    if (!portForwarded.data.ports || portForwarded.data.ports.length === 0) {
+      portForwarded.data.ports = [Number(instance.forwardedPort)];
+    }
   }
 
-  if (instance.airVpnApiKey && airVpnStatus.ok) {
-    try {
-      const portsData = await airVpnFetch(instance.airVpnApiKey, 'ports');
-      if (portsData && !portsData.error) airVpnPorts = portsData;
-    } catch (err) { console.error(`[airvpn][${instance.id}] ports fetch failed:`, err.message); }
+  // AirVPN: fetch status (public) + userinfo (keyed) separately from gluetun
+  let airVpnServer = null;
+  let airVpnUserInfo = null;
+  if (instance.airVpnApiKey) {
+    const airResults = await Promise.allSettled([
+      airVpnFetch(instance.airVpnApiKey, 'status'),
+      airVpnFetch(instance.airVpnApiKey, 'userinfo'),
+    ]);
+    airResults.forEach(r => { if (r.status === 'rejected') console.error(`[airvpn][${instance.id}]`, r.reason?.message); });
+    const [airVpnStatus, airVpnUserinfo] = airResults.map(r =>
+      r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
+    );
+
+    // Match current server by userinfo session server_name
+    if (airVpnStatus.ok && airVpnStatus.data?.servers) {
+      const servers = airVpnStatus.data.servers;
+      const serverName = airVpnUserinfo.ok
+        ? airVpnUserinfo.data?.connection?.server_name
+        : (vpnSettings?.ok ? vpnSettings.data?.provider?.server_selection?.names?.[0] : null);
+      if (serverName) {
+        airVpnServer = servers.find(s => s.public_name === serverName) || null;
+      }
+    }
+
+    if (airVpnUserinfo.ok) airVpnUserInfo = airVpnUserinfo.data;
   }
 
   return {
     timestamp: new Date().toISOString(),
     vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings,
     airVpnServer: airVpnServer ? { ok: true, data: airVpnServer } : { ok: false },
-    airVpnPorts:   airVpnPorts   ? { ok: true, data: airVpnPorts }   : { ok: false },
+    airVpnUserInfo: airVpnUserInfo ? { ok: true, data: airVpnUserInfo } : { ok: false },
     allFailed,
   };
 }
