@@ -7,6 +7,7 @@ const app = express();
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 app.disable('x-powered-by');
 const PORT = process.env.PORT || 3000;
+const LATENCY_CHART = process.env.LATENCY_CHART === 'true';
 
 // --- Docker Secrets Support ---
 // Try to read from /run/secrets/ (Docker Swarm/Compose secrets), fall back to env vars
@@ -165,6 +166,11 @@ async function fetchInstanceHealth(instance) {
   const allFailed = results.every(r => r.status === 'rejected');
   return { timestamp: new Date().toISOString(), vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed };
 }
+
+// --- Feature config endpoint ---
+app.get('/api/config', (req, res) => {
+  res.json({ latencyChart: LATENCY_CHART });
+});
 
 // --- Instance list endpoint ---
 app.get('/api/instances', (req, res) => {
