@@ -319,6 +319,170 @@ function applyAutoRefresh() {
   scheduleNextPoll();
 }
 
+// ---- Speed Test ----
+
+let speedtestEnabled = false;
+let speedtestRunning = false;
+
+function buildSpeedtestCard() {
+  const card = document.createElement('div');
+  card.className = 'card card-wide';
+  card.id = 'speedtest-card';
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">&#9889;</span>
+      <h3>Speed Test</h3>
+    </div>
+    <div class="card-body">
+      <div class="speedtest-controls">
+        <button id="speedtest-run" class="btn-success">&#9654; Run Test</button>
+        <span id="speedtest-status" class="muted"></span>
+      </div>
+      <div id="speedtest-result" class="speedtest-result hidden">
+        <div class="speedtest-stats">
+          <div class="speedtest-stat">
+            <span class="speedtest-stat-label">Download</span>
+            <span class="speedtest-stat-value mono" id="speedtest-dl">–</span>
+          </div>
+          <div class="speedtest-stat">
+            <span class="speedtest-stat-label">Upload</span>
+            <span class="speedtest-stat-value mono" id="speedtest-ul">–</span>
+          </div>
+          <div class="speedtest-stat">
+            <span class="speedtest-stat-label">Ping</span>
+            <span class="speedtest-stat-value mono" id="speedtest-ping">–</span>
+          </div>
+          <div class="speedtest-stat">
+            <span class="speedtest-stat-label">Server</span>
+            <span class="speedtest-stat-value mono" id="speedtest-server">–</span>
+          </div>
+        </div>
+        <div class="speedtest-chart-wrap">
+          <canvas id="speedtest-chart" width="400" height="80"></canvas>
+        </div>
+      </div>
+    </div>
+  `;
+  card.querySelector('#speedtest-run').addEventListener('click', runSpeedtest);
+  return card;
+}
+
+function formatMbps(bitsPerSec) {
+  if (!bitsPerSec || bitsPerSec === 0) return '–';
+  return (bitsPerSec / 1000000).toFixed(1) + ' Mbps';
+}
+
+async function runSpeedtest() {
+  if (speedtestRunning) return;
+  speedtestRunning = true;
+  const btn = document.getElementById('speedtest-run');
+  const status = document.getElementById('speedtest-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">&#x21bb;</span> Testing…';
+  status.textContent = 'Running speed test (may take 15–30 seconds)…';
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const res = await fetch('/api/speedtest', { signal: controller.signal });
+    clearTimeout(timeoutId);
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('speedtest-dl').textContent = formatMbps(data.download);
+      document.getElementById('speedtest-ul').textContent = formatMbps(data.upload);
+      document.getElementById('speedtest-ping').textContent = data.ping ? data.ping.toFixed(0) + ' ms' : '–';
+      document.getElementById('speedtest-server').textContent = data.server || '–';
+      document.getElementById('speedtest-result').classList.remove('hidden');
+      status.textContent = 'Completed';
+      loadAndRenderSpeedtestChart();
+    } else {
+      status.textContent = data.error || 'Test failed';
+    }
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '&#9654; Run Test';
+  speedtestRunning = false;
+}
+
+async function loadAndRenderSpeedtestChart() {
+  try {
+    const res = await fetch('/api/speedtest/history');
+    const data = await res.json();
+    if (!data.ok || !data.results.length) return;
+    renderSpeedtestChart(data.results);
+  } catch (_) {}
+}
+
+function renderSpeedtestChart(results) {
+  const canvas = document.getElementById('speedtest-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.parentElement.clientWidth;
+  const H = canvas.height = 80;
+  ctx.clearRect(0, 0, W, H);
+
+  const dl = results.map(r => r.download / 1000000);
+  const ul = results.map(r => r.upload / 1000000);
+  const maxVal = Math.max(...dl, ...ul, 1) * 1.15;
+  const step = results.length > 1 ? W / (results.length - 1) : W / 2;
+
+  function drawLine(values, color) {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    values.forEach((v, i) => {
+      const x = results.length === 1 ? W / 2 : i * step;
+      const y = H - (v / maxVal) * (H - 10) - 5;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  drawLine(dl, '#4ade80');
+  drawLine(ul, '#60a5fa');
+
+  // Legend
+  ctx.font = '11px system-ui';
+  ctx.fillStyle = '#4ade80';
+  ctx.fillText('↓ DL', 4, 12);
+  ctx.fillStyle = '#60a5fa';
+  ctx.fillText('↑ UL', 40, 12);
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'right';
+  ctx.fillText(results.length + ' tests', W - 4, 12);
+  ctx.textAlign = 'left';
+}
+
+async function initSpeedtest() {
+  try {
+    const res = await fetch('/api/speedtest/status');
+    const data = await res.json();
+    speedtestEnabled = data.enabled;
+  } catch (_) {}
+  if (!speedtestEnabled) return;
+
+  const card = buildSpeedtestCard();
+  const container = $('dashboards-container');
+  container.appendChild(card);
+
+  // Load existing history
+  try {
+    const res = await fetch('/api/speedtest/history');
+    const data = await res.json();
+    if (data.ok && data.results.length) {
+      const last = data.results[data.results.length - 1];
+      document.getElementById('speedtest-dl').textContent = formatMbps(last.download);
+      document.getElementById('speedtest-ul').textContent = formatMbps(last.upload);
+      document.getElementById('speedtest-ping').textContent = last.ping ? last.ping.toFixed(0) + ' ms' : '–';
+      document.getElementById('speedtest-server').textContent = last.server || '–';
+      document.getElementById('speedtest-result').classList.remove('hidden');
+      renderSpeedtestChart(data.results);
+    }
+  } catch (_) {}
+}
+
 // ---- Init ----
 
 $('refresh-btn').addEventListener('click', () => {
@@ -338,4 +502,5 @@ $('refresh-interval').addEventListener('change', applyAutoRefresh);
   renderAllDashboards();
   await pollAll();
   scheduleNextPoll();
+  initSpeedtest();
 })();
