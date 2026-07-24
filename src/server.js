@@ -183,23 +183,6 @@ async function airVpnFetch(apiKey, service, ttlMs = 120000) {
   }
 }
 
-function findAirVpnServer(servers, hostname, ips = []) {
-  if (!servers || servers.length === 0) return null;
-  const candidates = Array.isArray(servers) ? servers : Object.values(servers);
-  for (const s of candidates) {
-    if (hostname && s.public_name && hostname.toLowerCase().includes(s.public_name.toLowerCase())) return s;
-  }
-  for (const ipTarget of ips) {
-    if (!ipTarget) continue;
-    for (const s of candidates) {
-      for (let i = 1; i <= 4; i++) {
-        if (s[`ip_v4_in${i}`] === ipTarget || s[`ip_v6_in${i}`] === ipTarget) return s;
-      }
-    }
-  }
-  return null;
-}
-
 // --- Helper: aggregate health for one instance ---
 // Returns { timestamp, vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed }
 // allFailed = true if ALL 5 checks failed (service is completely unreachable)
