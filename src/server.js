@@ -45,6 +45,8 @@ function parseInstances() {
       apiKey:   getConfigValue(`GLUETUN_${i}_API_KEY`, `gluetun_${i}_api_key`),
       user:     getConfigValue(`GLUETUN_${i}_USER`, `gluetun_${i}_user`),
       password: getConfigValue(`GLUETUN_${i}_PASSWORD`, `gluetun_${i}_password`),
+      ipDisplayMode:    getConfigValue(`GLUETUN_${i}_IP_DISPLAY_MODE`,    `gluetun_${i}_ip_display_mode`)    || 'auto',
+      secondaryPublicIp: getConfigValue(`GLUETUN_${i}_SECONDARY_PUBLIC_IP`, `gluetun_${i}_secondary_public_ip`) || '',
     });
   }
   if (list.length === 0) {
@@ -64,6 +66,8 @@ function parseInstances() {
       apiKey:   getConfigValue('GLUETUN_API_KEY', 'gluetun_api_key'),
       user:     getConfigValue('GLUETUN_USER', 'gluetun_user'),
       password: getConfigValue('GLUETUN_PASSWORD', 'gluetun_password'),
+      ipDisplayMode:    getConfigValue('GLUETUN_IP_DISPLAY_MODE',    'gluetun_ip_display_mode')    || 'auto',
+      secondaryPublicIp: getConfigValue('GLUETUN_SECONDARY_PUBLIC_IP', 'gluetun_secondary_public_ip') || '',
     });
   }
   return list;
@@ -148,8 +152,8 @@ async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
 }
 
 // --- Helper: aggregate health for one instance ---
-// Returns { timestamp, vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed }
-// allFailed = true if ALL 5 checks failed (service is completely unreachable)
+// Returns { timestamp, vpnStatus, publicIp, publicIpv6, portForwarded, dnsStatus, vpnSettings, allFailed }
+// allFailed = true if ALL checks failed (service is completely unreachable)
 async function fetchInstanceHealth(instance) {
   const results = await Promise.allSettled([
     gluetunFetch(instance, '/v1/vpn/status'),
@@ -157,18 +161,42 @@ async function fetchInstanceHealth(instance) {
     gluetunFetch(instance, '/v1/portforward'),
     gluetunFetch(instance, '/v1/dns/status'),
     gluetunFetch(instance, '/v1/vpn/settings'),
+    fetchPublicIpv6(),
   ]);
   results.forEach(r => { if (r.status === 'rejected') console.error(`[upstream][${instance.id}]`, r.reason?.message); });
-  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = results.map(r =>
+  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, ipv6Result] = results.map(r =>
     r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
   );
-  const allFailed = results.every(r => r.status === 'rejected');
-  return { timestamp: new Date().toISOString(), vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed };
+  const publicIpv6 = ipv6Result?.ok && ipv6Result.data ? { ok: true, data: ipv6Result.data } : { ok: false, error: 'Not available' };
+  const allFailed = results.slice(0, 5).every(r => r.status === 'rejected');
+  return { timestamp: new Date().toISOString(), vpnStatus, publicIp, publicIpv6, portForwarded, dnsStatus, vpnSettings, allFailed };
+}
+
+// --- Fetch public IPv6 from external service (best-effort, 5s timeout) ---
+async function fetchPublicIpv6() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch('https://api6.ipify.org?format=json', {
+      signal: controller.signal,
+      redirect: 'error',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Only return if it's actually an IPv6 address
+    return data.ip && data.ip.includes(':') ? { ipv6: data.ip } : null;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // --- Instance list endpoint ---
 app.get('/api/instances', (req, res) => {
-  res.json(instances.map(({ id, name }) => ({ id, name })));
+  res.json(instances.map(({ id, name, ipDisplayMode, secondaryPublicIp }) =>
+    ({ id, name, ipDisplayMode, secondaryPublicIp })
+  ));
 });
 
 // --- Per-instance health endpoint ---
@@ -227,6 +255,18 @@ app.get('/api/portforwarded', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
   try {
     const data = await gluetunFetch(instances[0], '/v1/vpn/settings');
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+app.get('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(instance, '/v1/vpn/settings');
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);

@@ -1,4 +1,3 @@
-
 <div align="right">
   <details>
     <summary >🌐 Language</summary>
@@ -44,13 +43,15 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 
 - ✨ **Multi-VPN Support** — Monitor & control up to 20 Gluetun instances simultaneously
 - Live VPN status banner (connected / paused / disconnected)
-- Public exit IP, country, region, city, and organisation
+- Public exit IP with **auto-detected IPv6** — shows both IPv4 and IPv6 when available, with manual fallback
 - VPN provider, protocol (WireGuard / OpenVPN), server details
 - Port forwarding and DNS status
 - Start / Stop VPN controls
 - Auto-refresh with configurable interval (5s – 60s)
 - Last 30 poll ticks colour-coded in history bar
 - Responsive design (mobile, tablet, desktop)
+- Ability to change VPN server (hostname/IP) via UI
+- Persistent polling interval selection (via localStorage)
 
 ---
 
@@ -119,11 +120,11 @@ gluetun-webui:
     - GLUETUN_1_NAME=VPN - London
     - GLUETUN_1_URL=http://gluetun-1:8000
     - GLUETUN_1_API_KEY=token1
-    
-    - GLUETUN_2_NAME=VPN - Amsterdam  
+
+    - GLUETUN_2_NAME=VPN - Amsterdam
     - GLUETUN_2_URL=http://gluetun-2:8000
     - GLUETUN_2_API_KEY=token2
-    
+
     - GLUETUN_3_NAME=VPN - Singapore
     - GLUETUN_3_URL=http://gluetun-3:8000
     - GLUETUN_3_API_KEY=token3
@@ -238,7 +239,7 @@ Each instance can have different authentication:
 # Instance with API key
 - GLUETUN_1_API_KEY=my-secret-token
 
-# Instance with HTTP Basic auth
+# Instance with HTTP Auth
 - GLUETUN_2_USER=admin
 - GLUETUN_2_PASSWORD=mysecret
 
@@ -258,6 +259,8 @@ Each instance can have different authentication:
 | `GLUETUN_{N}_API_KEY` | _(empty)_ | Bearer token for instance N (if auth enabled) |
 | `GLUETUN_{N}_USER` | _(empty)_ | Username for HTTP Basic auth (instance N) |
 | `GLUETUN_{N}_PASSWORD` | _(empty)_ | Password for HTTP Basic auth (instance N) |
+| `GLUETUN_{N}_IP_DISPLAY_MODE` | `auto` | IP display mode: `auto` (show both if IPv6 detected), `dual` (force both), or single IPv4 only |
+| `GLUETUN_{N}_SECONDARY_PUBLIC_IP` | _(empty)_ | Manual override for secondary IP (e.g. IPv6). Used when auto-detection fails. Typically not needed — see [IPv6 Setup](#ipv6-setup) |
 | `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | **Legacy** – single instance only (fallback if no `GLUETUN_1_*` vars) |
 | `GLUETUN_API_KEY` | _(empty)_ | **Legacy** – Bearer token for single instance |
 | `GLUETUN_USER` | _(empty)_ | **Legacy** – Username for HTTP Basic auth |
@@ -322,6 +325,125 @@ labels:
   - "traefik.http.middlewares.auth.basicauth.users=user:$$apr1$$<hash>"
 ```
 Generate a hash with: `htpasswd -nb user password`
+
+---
+
+## IPv6 Setup
+
+The web UI **auto-detects** your public IPv6 address via an external service ([api6.ipify.org](https://api6.ipify.org)) and displays it alongside IPv4 when available. No configuration is needed on the web UI side — if Gluetun has IPv6 connectivity, the UI shows both addresses automatically.
+
+**However**, Docker containers don't have IPv6 by default. You must configure your Docker daemon and Gluetun for IPv6 to work. Without this, the UI will only show IPv4.
+
+### Step 1: Enable IPv6 in Docker Daemon
+
+Edit `/etc/docker/daemon.json` on your Linux host:
+
+```json
+{
+  "ipv6": true,
+  "ip6tables": true,
+  "fixed-cidr-v6": "fd7d:1234::/80"
+}
+```
+
+> **Note:** `fixed-cidr-v6` assigns IPv6 addresses to containers on the default bridge network. For custom networks (recommended), you'll configure per-network subnets in Step 2. The `fd7d:1234::/80` prefix is a ULA (Unique Local Address) range — any routable ULA works.
+
+Restart Docker after editing:
+
+```bash
+sudo systemctl restart docker
+```
+
+### Step 2: Configure Gluetun's Docker Network for IPv6
+
+In your `docker-compose.yml`, add IPv6 to the network and sysctls to Gluetun:
+
+```yaml
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0          # Enable IPv6 inside the container
+    networks:
+      - vpn
+
+  gluetun-webui:
+    image: scuzza/gluetun-webui:latest
+    # ... rest of config ...
+    networks:
+      - vpn
+
+networks:
+  vpn:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16      # IPv4 subnet (adjust to your setup)
+        - subnet: fd00:dead:beef::/48  # IPv6 subnet (ULA range)
+```
+
+> **Note:** The `fd00:dead:beef::/48` prefix is arbitrary — any ULA prefix works. The `/48` gives you plenty of room for multiple networks.
+
+### Step 3: Add IPv6 to WireGuard Addresses
+
+This is the critical step. Your VPN provider must assign you an IPv6 address via WireGuard. For AirVPN:
+
+1. Go to [AirVPN WireGuard config generator](https://airvpn.org/wireguard/)
+2. Note the `AllowedIPs` line — it contains both IPv4 and IPv6 CIDRs, e.g.:
+   ```
+   AllowedIPs = 0.0.0.0/0, ::/0
+   Address = 10.x.x.x/32,2a0a:xxxx:xxxx::128/128
+   ```
+3. Set `WIREGUARD_ADDRESSES` in Gluetun with **both** addresses:
+
+```yaml
+services:
+  gluetun:
+    environment:
+      - VPN_SERVICE_PROVIDER=airvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=yourkey
+      - WIREGUARD_ADDRESSES=10.x.x.x/32,2a0a:xxxx:xxxx::128/128
+```
+
+> **Critical:** `WIREGUARD_ADDRESSES` must include the IPv6 CIDR from your provider. Without it, Gluetun won't route IPv6 traffic even if Docker is configured for it.
+
+### Step 4: Verify
+
+1. Restart Gluetun: `docker compose up -d gluetun`
+2. Check Gluetun has IPv6:
+   ```bash
+   docker exec gluetun wget -qO- https://api6.ipify.org?format=json
+   # Should return: {"ipv6":"2a0a:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx"}
+   ```
+3. Open the web UI — the AirVPN card should now show both IPs with labels:
+
+```
+Public IP
+  213.152.187.215  (IPv4)
+  2a0a:b640:1:5:bc4e:595b:17f4:659c  (IPv6)
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Only IPv4 shows in UI | Gluetun doesn't have IPv6 — check Steps 1–3 |
+| `docker exec gluetun wget` returns "Network unreachable" | Docker daemon IPv6 not enabled or network missing `enable_ipv6: true` |
+| Gluetun won't start | Check `WIREGUARD_ADDRESSES` format — must be `ipv4/32,ipv6/128` (comma-separated, no spaces) |
+| IPv6 works but UI doesn't show it | Open browser devtools → Network tab → check `/api/1/health` response has `publicIpv6.ok: true` |
+
+### Manual Fallback
+
+If auto-detection fails (e.g. behind a restrictive proxy), you can manually set the IPv6 address:
+
+```yaml
+environment:
+  - GLUETUN_1_SECONDARY_PUBLIC_IP=2a0a:xxxx:xxxx::128
+  - GLUETUN_1_IP_DISPLAY_MODE=dual
+```
+
+This forces display of both addresses without relying on external detection.
 
 ---
 

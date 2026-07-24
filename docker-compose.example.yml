@@ -45,6 +45,52 @@ networks:
   gluetun-stack:
     driver: bridge
 
+# ============================================================================
+# OPTION C: With IPv6 Support
+# Enable dual-stack (IPv4 + IPv6) for both Gluetun and webui
+# Requires: Docker daemon with ipv6=true in /etc/docker/daemon.json
+# ============================================================================
+
+# services:
+#   gluetun:
+#     image: qmcgaw/gluetun:latest
+#     sysctls:
+#       net.ipv6.conf.all.disable_ipv6: 0
+#     environment:
+#       - VPN_SERVICE_PROVIDER=airvpn
+#       - VPN_TYPE=wireguard
+#       - WIREGUARD_PRIVATE_KEY=yourkey
+#       # Include IPv6 CIDR from your provider's WireGuard config:
+#       - WIREGUARD_ADDRESSES=10.x.x.x/32,2a0a:xxxx:xxxx::128/128
+#     networks:
+#       - vpn
+#
+#   gluetun-webui:
+#     image: scuzza/gluetun-webui:latest
+#     container_name: gluetun-webui
+#     ports:
+#       - "127.0.0.1:3000:3000"
+#     environment:
+#       - GLUETUN_CONTROL_URL=http://gluetun:8000
+#     networks:
+#       - vpn
+#     restart: unless-stopped
+#     read_only: true
+#     tmpfs:
+#       - /tmp
+#     security_opt:
+#       - no-new-privileges:true
+#     cap_drop:
+#       - ALL
+#
+# networks:
+#   vpn:
+#     enable_ipv6: true
+#     ipam:
+#       config:
+#         - subnet: 172.28.0.0/16
+#         - subnet: fd00:dead:beef::/48
+
 
 # ============================================================================
 # OPTION A2 (commented): Multiple Instances
