@@ -149,26 +149,6 @@ function buildDashboardGroup(inst) {
         </div>
       </div>
 
-      <!-- Latency card -->
-      <div class="card card-wide">
-        <div class="card-header">
-          <span class="card-icon">&#9889;</span>
-          <h3>Latency (last 30 polls)</h3>
-          <span id="i${id}-latency-stat" class="stat-value" style="margin-left:auto;font-size:0.9rem">–</span>
-        </div>
-        <div class="card-body">
-          <div class="latency-chart-wrapper">
-            <div class="latency-chart" id="i${id}-latency-chart"></div>
-          </div>
-          <div class="history-legend">
-            <span class="dot latency-good"></span> <150ms &nbsp;
-            <span class="dot latency-warn"></span> 150–400ms &nbsp;
-            <span class="dot latency-bad"></span> >400ms &nbsp;
-            <span class="dot unknown"></span> Failed
-          </div>
-        </div>
-      </div>
-
       <!-- AirVPN server card -->
       <div class="card card-wide airvpn-card" id="i${id}-airvpn-card" style="display:none">
         <div class="card-header">
