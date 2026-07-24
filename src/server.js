@@ -26,12 +26,13 @@ function getConfigValue(envVar, secretName = null) {
 //   GLUETUN_2_URL, GLUETUN_2_NAME, ...
 // Or via Docker secrets: gluetun_1_url, gluetun_1_api_key, etc.
 // Falls back to legacy single-instance vars (GLUETUN_CONTROL_URL, GLUETUN_API_KEY, etc.)
+
 function parseInstances() {
+  const sharedAirVpnApiKey = getConfigValue('AIRVPN_API_KEY', 'airvpn_api_key');
   const list = [];
   for (let i = 1; i <= 20; i++) {
     const url = getConfigValue(`GLUETUN_${i}_URL`, `gluetun_${i}_url`);
     if (!url) continue;
-    // Validate URL at startup (fail-fast)
     try {
       new URL(url);
     } catch (err) {
@@ -45,6 +46,10 @@ function parseInstances() {
       apiKey:   getConfigValue(`GLUETUN_${i}_API_KEY`, `gluetun_${i}_api_key`),
       user:     getConfigValue(`GLUETUN_${i}_USER`, `gluetun_${i}_user`),
       password: getConfigValue(`GLUETUN_${i}_PASSWORD`, `gluetun_${i}_password`),
+      ipDisplayMode:    getConfigValue(`GLUETUN_${i}_IP_DISPLAY_MODE`,    `gluetun_${i}_ip_display_mode`)    || 'auto',
+      secondaryPublicIp: getConfigValue(`GLUETUN_${i}_SECONDARY_PUBLIC_IP`, `gluetun_${i}_secondary_public_ip`) || '',
+      airVpnApiKey: getConfigValue(`GLUETUN_${i}_AIRVPN_API_KEY`, `gluetun_${i}_airvpn_api_key`) || sharedAirVpnApiKey,
+      forwardedPort: getConfigValue(`GLUETUN_${i}_FORWARDED_PORT`, `gluetun_${i}_forwarded_port`) || getConfigValue('FORWARDED_PORT', 'forwarded_port'),
     });
   }
   if (list.length === 0) {
@@ -64,6 +69,10 @@ function parseInstances() {
       apiKey:   getConfigValue('GLUETUN_API_KEY', 'gluetun_api_key'),
       user:     getConfigValue('GLUETUN_USER', 'gluetun_user'),
       password: getConfigValue('GLUETUN_PASSWORD', 'gluetun_password'),
+      ipDisplayMode:    getConfigValue('GLUETUN_IP_DISPLAY_MODE',    'gluetun_ip_display_mode')    || 'auto',
+      secondaryPublicIp: getConfigValue('GLUETUN_SECONDARY_PUBLIC_IP', 'gluetun_secondary_public_ip') || '',
+      airVpnApiKey: sharedAirVpnApiKey,
+      forwardedPort: getConfigValue('FORWARDED_PORT', 'forwarded_port'),
     });
   }
   return list;
@@ -109,8 +118,8 @@ app.use('/api/', (req, res, next) => req.method === 'GET' ? readLimiter(req, res
 
 // Security headers
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy',
-    "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:");
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -147,23 +156,92 @@ async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
   }
 }
 
+// --- AirVPN API helpers ---
+
+// ponytail: global cache, keyed by apiKey (or 'public' for no-key). TTL 2min.
+const airVpnCache = new Map();
+
+async function airVpnFetch(apiKey, service, ttlMs = 120000) {
+  const cacheKey = `${apiKey || 'public'}:${service}`;
+  const cached = airVpnCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  const params = new URLSearchParams({ service, format: 'json' });
+  if (apiKey) params.set('key', apiKey);
+  const url = `https://airvpn.org/api/?${params}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    if (!res.ok) throw new Error(`AirVPN returned ${res.status}`);
+    const data = await res.json();
+    airVpnCache.set(cacheKey, { data, expires: Date.now() + ttlMs });
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // --- Helper: aggregate health for one instance ---
 // Returns { timestamp, vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed }
 // allFailed = true if ALL 5 checks failed (service is completely unreachable)
 async function fetchInstanceHealth(instance) {
-  const results = await Promise.allSettled([
+  const gluetunResults = await Promise.allSettled([
     gluetunFetch(instance, '/v1/vpn/status'),
     gluetunFetch(instance, '/v1/publicip/ip'),
     gluetunFetch(instance, '/v1/portforward'),
     gluetunFetch(instance, '/v1/dns/status'),
     gluetunFetch(instance, '/v1/vpn/settings'),
   ]);
-  results.forEach(r => { if (r.status === 'rejected') console.error(`[upstream][${instance.id}]`, r.reason?.message); });
-  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = results.map(r =>
+  gluetunResults.forEach(r => { if (r.status === 'rejected') console.error(`[upstream][${instance.id}]`, r.reason?.message); });
+  const [vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings] = gluetunResults.map(r =>
     r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
   );
-  const allFailed = results.every(r => r.status === 'rejected');
-  return { timestamp: new Date().toISOString(), vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings, allFailed };
+  const allFailed = gluetunResults.every(r => r.status === 'rejected');
+
+  // Merge env var forwarded port when Gluetun returns 0 (AirVPN doesn't write to status file)
+  if (portForwarded.ok && portForwarded.data && portForwarded.data.port === 0 && instance.forwardedPort) {
+    portForwarded.data.port = Number(instance.forwardedPort);
+    if (!portForwarded.data.ports || portForwarded.data.ports.length === 0) {
+      portForwarded.data.ports = [Number(instance.forwardedPort)];
+    }
+  }
+
+  // AirVPN: fetch status (public) + userinfo (keyed) separately from gluetun
+  let airVpnServer = null;
+  let airVpnUserInfo = null;
+  if (instance.airVpnApiKey) {
+    const airResults = await Promise.allSettled([
+      airVpnFetch(instance.airVpnApiKey, 'status'),
+      airVpnFetch(instance.airVpnApiKey, 'userinfo'),
+    ]);
+    airResults.forEach(r => { if (r.status === 'rejected') console.error(`[airvpn][${instance.id}]`, r.reason?.message); });
+    const [airVpnStatus, airVpnUserinfo] = airResults.map(r =>
+      r.status === 'fulfilled' ? { ok: true, data: r.value } : { ok: false, error: 'Upstream error' }
+    );
+
+    // Match current server by userinfo session server_name
+    if (airVpnStatus.ok && airVpnStatus.data?.servers) {
+      const servers = airVpnStatus.data.servers;
+      const serverName = airVpnUserinfo.ok
+        ? airVpnUserinfo.data?.connection?.server_name
+        : (vpnSettings?.ok ? vpnSettings.data?.provider?.server_selection?.names?.[0] : null);
+      if (serverName) {
+        airVpnServer = servers.find(s => s.public_name === serverName) || null;
+      }
+    }
+
+    if (airVpnUserinfo.ok) airVpnUserInfo = airVpnUserinfo.data;
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    vpnStatus, publicIp, portForwarded, dnsStatus, vpnSettings,
+    airVpnServer: airVpnServer ? { ok: true, data: airVpnServer } : { ok: false },
+    airVpnUserInfo: airVpnUserInfo ? { ok: true, data: airVpnUserInfo } : { ok: false },
+    allFailed,
+  };
 }
 
 // --- Instance list endpoint ---

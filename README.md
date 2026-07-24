@@ -50,6 +50,8 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 - Start / Stop VPN controls
 - Auto-refresh with configurable interval (5s – 60s)
 - Last 30 poll ticks colour-coded in history bar
+- Latency bar chart showing round-trip time to each Gluetun instance (green/yellow/red)
+- AirVPN integration — server load, health, bandwidth, and forwarded ports (requires `AIRVPN_API_KEY`)
 - Responsive design (mobile, tablet, desktop)
 
 ---
@@ -258,6 +260,10 @@ Each instance can have different authentication:
 | `GLUETUN_{N}_API_KEY` | _(empty)_ | Bearer token for instance N (if auth enabled) |
 | `GLUETUN_{N}_USER` | _(empty)_ | Username for HTTP Basic auth (instance N) |
 | `GLUETUN_{N}_PASSWORD` | _(empty)_ | Password for HTTP Basic auth (instance N) |
+| `GLUETUN_{N}_IP_DISPLAY_MODE` | `auto` | Display mode for public IP (`auto`, `dual`). In `auto` mode with `GLUETUN_{N}_SECONDARY_PUBLIC_IP` set, both IPs are shown stacked with IPv4/IPv6 labels |
+| `GLUETUN_{N}_SECONDARY_PUBLIC_IP` | _(empty)_ | Secondary public IP address (e.g. IPv6 if Gluetun reports IPv4). When set alongside `IP_DISPLAY_MODE=auto`, both IPs display stacked |
+| `GLUETUN_{N}_AIRVPN_API_KEY` | _(empty)_ | AirVPN API key for server status & port forwarding (also settable globally via `AIRVPN_API_KEY`) |
+| `AIRVPN_API_KEY` | _(empty)_ | **Global** AirVPN API key used across all instances unless overridden per-instance |
 | `GLUETUN_CONTROL_URL` | `http://gluetun:8000` | **Legacy** – single instance only (fallback if no `GLUETUN_1_*` vars) |
 | `GLUETUN_API_KEY` | _(empty)_ | **Legacy** – Bearer token for single instance |
 | `GLUETUN_USER` | _(empty)_ | **Legacy** – Username for HTTP Basic auth |
