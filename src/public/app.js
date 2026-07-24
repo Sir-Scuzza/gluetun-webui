@@ -9,6 +9,7 @@ const MAX_LATENCY_DISPLAY_MS = 800;
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
 let refreshTimer = null;
+let latencyChartEnabled = false;
 const instanceSettings = new Map(); // id -> settings object (from /api/:instanceId/health vpnSettings.data)
 const latencyHistory   = new Map(); // id -> number[] (ms, newest last)
 
@@ -111,7 +112,7 @@ function renderLatencyChartFor(id) {
     return `<rect x="${i * (barW + BAR_GAP)}" y="${y}" width="${barW}" height="${height}" rx="2" fill="${color}" opacity="0.85" />`;
   }).join('');
 
-  container.innerHTML = `<svg width="${svgW}" height="${H}" style="display:block">${bars}</svg>`;
+  container.innerHTML = `<svg width="${svgW}" height="${H}">${bars}</svg>`;
 
   const latest = hist[hist.length - 1];
   const statEl = document.getElementById(`i${id}-latency-stat`);
@@ -211,7 +212,8 @@ function buildDashboardGroup(inst) {
           </div>
         </div>
       </div>
-    <!-- Latency card -->
+    <!-- Latency card (when enabled) -->
+      ${latencyChartEnabled ? `
       <div class="card card-wide">
         <div class="card-header">
           <span class="card-icon">&#9889;</span>
@@ -230,6 +232,7 @@ function buildDashboardGroup(inst) {
           </div>
         </div>
       </div>
+      ` : ''}
     </div>
   `;
   group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
@@ -243,7 +246,7 @@ function renderAllDashboards() {
   instances.forEach(inst => {
     container.appendChild(buildDashboardGroup(inst));
     renderHistoryFor(inst.id);
-    renderLatencyChartFor(inst.id);
+    if (latencyChartEnabled) renderLatencyChartFor(inst.id);
   });
   // Set grid columns: 1=full, 2=half, 3=third, 4=quarter
   const cols = Math.min(instances.length, 4) || 1;
@@ -353,13 +356,13 @@ async function pollAll() {
       const t0 = performance.now();
       const health = await fetchHealth(inst.id);
       const latencyMs = Math.round(performance.now() - t0);
-      pushLatencyFor(inst.id, latencyMs);
+      if (latencyChartEnabled) pushLatencyFor(inst.id, latencyMs);
       updatePanel(inst, health);
-      renderLatencyChartFor(inst.id);
+      if (latencyChartEnabled) renderLatencyChartFor(inst.id);
     } catch (_) {
-      pushLatencyFor(inst.id, null);
+      if (latencyChartEnabled) pushLatencyFor(inst.id, null);
       updatePanelError(inst);
-      renderLatencyChartFor(inst.id);
+      if (latencyChartEnabled) renderLatencyChartFor(inst.id);
     }
   }));
 
@@ -418,16 +421,25 @@ $('refresh-interval').addEventListener('change', applyAutoRefresh);
 
 (async () => {
   try {
+    const cfgRes = await fetch('/api/config');
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      latencyChartEnabled = cfg.latencyChart === true;
+    }
+  } catch (_) {}
+  try {
     const res = await fetch('/api/instances');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     instances = await res.json();
   } catch (_) {
     instances = [{ id: '1', name: 'Gluetun' }];
   }
-  instances.forEach(inst => {
-    const hist = loadLatencyFor(inst.id);
-    if (hist.length > 0) latencyHistory.set(inst.id, hist);
-  });
+  if (latencyChartEnabled) {
+    instances.forEach(inst => {
+      const hist = loadLatencyFor(inst.id);
+      if (hist.length > 0) latencyHistory.set(inst.id, hist);
+    });
+  }
   renderAllDashboards();
   await pollAll();
   scheduleNextPoll();

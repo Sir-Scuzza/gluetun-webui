@@ -19,6 +19,8 @@ services:
       #- GLUETUN_PASSWORD=password
       # Set to 'true' if behind a reverse proxy (nginx, Traefik, etc.)
       #- TRUST_PROXY=false
+      # Uncomment to enable the latency chart (poll round-trip time)
+      #- LATENCY_CHART=false
     
     networks:
       - gluetun-stack
