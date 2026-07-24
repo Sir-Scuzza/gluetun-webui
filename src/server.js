@@ -118,8 +118,8 @@ app.use('/api/', (req, res, next) => req.method === 'GET' ? readLimiter(req, res
 
 // Security headers
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy',
-    "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:");
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'no-referrer');

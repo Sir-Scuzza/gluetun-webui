@@ -6,6 +6,7 @@ const VALID_STATES = new Set(['connected', 'paused', 'disconnected', 'unknown'])
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
 let refreshTimer = null;
+const instanceSettings = new Map();
 
 // ---- Utility ----
 
@@ -393,7 +394,8 @@ async function pollAll() {
     try {
       const health = await fetchHealth(inst.id);
       updatePanel(inst, health);
-    } catch (_) {
+    } catch (err) {
+      console.error(`[poll][${inst.id}]`, err);
       updatePanelError(inst);
     }
   }));
