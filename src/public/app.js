@@ -79,9 +79,9 @@ function buildDashboardGroup(inst) {
       </div>
     </div>
 
-    <div class="dashboard-grid">
+    <div class="dashboard-grid" id="i${id}-grid">
       <!-- Public IP card -->
-      <div class="card">
+      <div class="card" data-card-id="ip" draggable="false">
         <div class="card-header">
           <span class="card-icon">&#127760;</span>
           <h3>${escHtml(inst.name)}</h3>
@@ -95,7 +95,7 @@ function buildDashboardGroup(inst) {
       </div>
 
       <!-- VPN details card -->
-      <div class="card">
+      <div class="card" data-card-id="vpn" draggable="false">
         <div class="card-header">
           <span class="card-icon">&#128274;</span>
           <h3>VPN Connection</h3>
@@ -111,7 +111,7 @@ function buildDashboardGroup(inst) {
       </div>
 
       <!-- Port forwarding card -->
-      <div class="card">
+      <div class="card" data-card-id="port" draggable="false">
         <div class="card-header">
           <span class="card-icon">&#128268;</span>
           <h3>Port Forwarding</h3>
@@ -122,7 +122,7 @@ function buildDashboardGroup(inst) {
       </div>
 
       <!-- DNS card -->
-      <div class="card">
+      <div class="card" data-card-id="dns" draggable="false">
         <div class="card-header">
           <span class="card-icon">&#128225;</span>
           <h3>DNS</h3>
@@ -133,7 +133,7 @@ function buildDashboardGroup(inst) {
       </div>
 
       <!-- History card -->
-      <div class="card card-wide">
+      <div class="card card-wide" data-card-id="history" draggable="false">
         <div class="card-header">
           <span class="card-icon">&#128200;</span>
           <h3>Status History (last 30 polls)</h3>
@@ -160,6 +160,7 @@ function renderAllDashboards() {
   container.innerHTML = '';
   instances.forEach(inst => {
     container.appendChild(buildDashboardGroup(inst));
+    applyLayout(inst.id);
     renderHistoryFor(inst.id);
   });
   // Set grid columns: 1=full, 2=half, 3=third, 4=quarter
@@ -319,6 +320,258 @@ function applyAutoRefresh() {
   scheduleNextPoll();
 }
 
+// ---- Edit Mode ----
+
+const CARD_IDS = ['ip', 'vpn', 'port', 'dns', 'history'];
+let editMode = false;
+let dragSrcCard = null;
+
+function layoutKey(instId) { return `gluetun_layout_${instId}`; }
+
+function defaultLayout() {
+  return { order: [...CARD_IDS], sizes: {}, hidden: [] };
+}
+
+function loadLayout(instId) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(layoutKey(instId)));
+    if (raw && Array.isArray(raw.order)) return raw;
+  } catch (_) {}
+  return defaultLayout();
+}
+
+function saveLayout(instId, layout) {
+  try { localStorage.setItem(layoutKey(instId), JSON.stringify(layout)); } catch (_) {}
+}
+
+function applyLayout(instId) {
+  const grid = document.getElementById(`i${instId}-grid`);
+  if (!grid) return;
+  const layout = loadLayout(instId);
+  const cards = {};
+
+  grid.querySelectorAll('.card[data-card-id]').forEach(c => {
+    cards[c.dataset.cardId] = c;
+  });
+
+  // Reorder
+  layout.order.forEach(cid => {
+    if (cards[cid]) grid.appendChild(cards[cid]);
+  });
+
+  // Sizes
+  CARD_IDS.forEach(cid => {
+    const card = cards[cid];
+    if (!card) return;
+    const span = layout.sizes[cid] || 1;
+    card.style.gridColumn = span >= 4 ? '1 / -1' : `span ${span}`;
+    // card-wide class is just for initial default, override with explicit span
+    card.classList.toggle('card-wide', false);
+  });
+
+  // Hidden
+  CARD_IDS.forEach(cid => {
+    const card = cards[cid];
+    if (!card) return;
+    card.style.display = layout.hidden.includes(cid) ? 'none' : '';
+  });
+
+  applyLayoutUI(instId);
+}
+
+function applyLayoutUI(instId) {
+  const layout = loadLayout(instId);
+  document.querySelectorAll(`#i${instId}-grid .card[data-card-id]`).forEach(card => {
+    const cid = card.dataset.cardId;
+    // Drag
+    card.draggable = editMode;
+    // Resize handle (right edge)
+    let rh = card.querySelector('.resize-handle');
+    if (editMode) {
+      if (!rh) {
+        rh = document.createElement('div');
+        rh.className = 'resize-handle';
+        rh.title = 'Drag to resize';
+        rh.addEventListener('mousedown', (e) => startResize(e, instId, cid));
+        card.appendChild(rh);
+      }
+      rh.style.display = '';
+    } else if (rh) {
+      rh.style.display = 'none';
+    }
+  });
+
+  // Drag events for reorder
+  if (editMode) {
+    const gridEl = document.getElementById(`i${instId}-grid`);
+    if (gridEl) {
+      gridEl.querySelectorAll('.card[data-card-id]').forEach(card => {
+        card.addEventListener('dragstart', onDragStart);
+        card.addEventListener('dragover', onDragOver);
+        card.addEventListener('drop', onDrop);
+        card.addEventListener('dragend', onDragEnd);
+      });
+    }
+  }
+
+  // Update show/hide panel
+  renderVisibilityPanel(instId);
+}
+
+// ---- Edge-drag resize ----
+
+function startResize(e, instId, cid) {
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = document.getElementById(`i${instId}-grid`);
+  const card = grid.querySelector(`[data-card-id="${cid}"]`);
+  if (!grid || !card) return;
+
+  const startX = e.clientX;
+  const gridRect = grid.getBoundingClientRect();
+  const numCols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  const colWidth = gridRect.width / numCols;
+  const startSpan = loadLayout(instId).sizes[cid] || 1;
+
+  card.classList.add('resizing');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  // Create grid overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'grid-overlay';
+  overlay.style.cssText = `
+    position:absolute; top:0; left:${gridRect.left - grid.parentElement.getBoundingClientRect().left}px;
+    width:${gridRect.width}px; height:${gridRect.height}px;
+    display:flex; pointer-events:none; z-index:10;
+  `;
+  for (let i = 0; i < numCols; i++) {
+    const col = document.createElement('div');
+    col.className = 'grid-col-guide';
+    col.style.cssText = `flex:1; border-right:1px dashed rgba(74,222,128,0.3); transition: background 0.1s;`;
+    overlay.appendChild(col);
+  }
+  grid.parentElement.style.position = 'relative';
+  grid.parentElement.appendChild(overlay);
+
+  let activeSpan = startSpan;
+
+  function onMove(ev) {
+    const delta = ev.clientX - startX;
+    const spanDelta = Math.round(delta / colWidth);
+    activeSpan = Math.max(1, Math.min(numCols, startSpan + spanDelta));
+    card.style.gridColumn = activeSpan >= numCols ? '1 / -1' : `span ${activeSpan}`;
+    // Highlight active columns in overlay
+    overlay.querySelectorAll('.grid-col-guide').forEach((col, i) => {
+      col.style.background = i < activeSpan ? 'rgba(74,222,128,0.08)' : '';
+    });
+  }
+
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    card.classList.remove('resizing');
+    overlay.remove();
+
+    const layout = loadLayout(instId);
+    layout.sizes[cid] = activeSpan;
+    saveLayout(instId, layout);
+    applyLayout(instId);
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function onDragStart(e) {
+  dragSrcCard = this;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', this.dataset.cardId);
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  this.classList.add('drag-over');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  const instId = this.closest('.dashboard-group')?.id?.replace('dashboard-', '');
+  if (!instId || !dragSrcCard || dragSrcCard === this) return;
+  const layout = loadLayout(instId);
+  const fromId = dragSrcCard.dataset.cardId;
+  const toId = this.dataset.cardId;
+  const fromIdx = layout.order.indexOf(fromId);
+  const toIdx = layout.order.indexOf(toId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  layout.order.splice(fromIdx, 1);
+  layout.order.splice(toIdx, 0, fromId);
+  saveLayout(instId, layout);
+  applyLayout(instId);
+}
+
+function onDragEnd() {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragSrcCard = null;
+}
+
+function renderVisibilityPanel(instId) {
+  let panel = document.getElementById(`i${instId}-visibility-panel`);
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = `i${instId}-visibility-panel`;
+    panel.className = 'visibility-panel';
+    const group = document.getElementById(`dashboard-${instId}`);
+    if (group) group.insertBefore(panel, group.querySelector('.dashboard-grid'));
+  }
+  if (!editMode) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const layout = loadLayout(instId);
+  const labels = { ip: 'Public IP', vpn: 'VPN Connection', port: 'Port Forwarding', dns: 'DNS', history: 'History' };
+  panel.innerHTML = CARD_IDS.map(cid => {
+    const vis = !layout.hidden.includes(cid);
+    return `<label class="vis-toggle"><input type="checkbox" data-vis-cid="${cid}" ${vis ? 'checked' : ''}> ${labels[cid]}</label>`;
+  }).join('') + `<button class="reset-layout-btn" title="Reset to default layout">↺ Reset</button>`;
+  panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const layout = loadLayout(instId);
+      const cid = cb.dataset.visCid;
+      if (cb.checked) {
+        layout.hidden = layout.hidden.filter(h => h !== cid);
+      } else {
+        if (!layout.hidden.includes(cid)) layout.hidden.push(cid);
+      }
+      saveLayout(instId, layout);
+      applyLayout(instId);
+    });
+  });
+  panel.querySelector('.reset-layout-btn')?.addEventListener('click', () => {
+    saveLayout(instId, defaultLayout());
+    applyLayout(instId);
+    showToast('Layout reset to defaults', 'success');
+  });
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  const btn = $('edit-toggle');
+  btn.classList.toggle('active', editMode);
+  btn.innerHTML = editMode ? '&#10003; Done' : '&#9998; Edit';
+  document.querySelectorAll('.dashboard-group').forEach(group => {
+    const instId = group.id.replace('dashboard-', '');
+    applyLayout(instId);
+    applyLayoutUI(instId);
+    const panel = document.getElementById(`i${instId}-visibility-panel`);
+    if (panel) panel.style.display = editMode ? '' : 'none';
+  });
+}
+
 // ---- Init ----
 
 $('refresh-btn').addEventListener('click', () => {
@@ -326,6 +579,7 @@ $('refresh-btn').addEventListener('click', () => {
   pollAll().then(() => scheduleNextPoll());
 });
 $('refresh-interval').addEventListener('change', applyAutoRefresh);
+$('edit-toggle').addEventListener('click', toggleEditMode);
 
 (async () => {
   try {
