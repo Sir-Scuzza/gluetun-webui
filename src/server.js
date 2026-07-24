@@ -3,6 +3,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
+const SPEEDTEST_ENABLED = process.env.SPEEDTEST_ENABLED === 'true';
+
 const app = express();
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 app.disable('x-powered-by');
@@ -305,6 +307,67 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
     res.status(502).json({ ok: false, error: 'Upstream error' });
   }
 });
+
+// --- Speed test (optional, gated by SPEEDTEST_ENABLED) ---
+const speedtestHistory = [];
+const SPEEDTEST_MAX_HISTORY = 20;
+const SPEEDTEST_BIN = process.env.SPEEDTEST_BIN || '/usr/local/bin/speedtest';
+
+app.get('/api/speedtest/status', (req, res) => {
+  res.json({ enabled: SPEEDTEST_ENABLED });
+});
+
+if (SPEEDTEST_ENABLED) {
+  const { execFile } = require('child_process');
+  const { promisify } = require('util');
+  const execFileAsync = promisify(execFile);
+
+  let running = false;
+  app.get('/api/speedtest', async (req, res) => {
+    if (running) return res.status(409).json({ ok: false, error: 'Speed test already in progress' });
+    running = true;
+    let lastErr;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { stdout } = await execFileAsync(SPEEDTEST_BIN, ['--accept-license', '--accept-gdpr', '-f', 'json', '-P', '8'], {
+          timeout: 90000,
+          maxBuffer: 1024 * 1024,
+        });
+        let result;
+        for (const line of stdout.split('\n')) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'result') result = obj;
+          } catch (_) {}
+        }
+        if (!result) throw new Error('No result received from speedtest');
+        const entry = {
+          timestamp: new Date().toISOString(),
+          download: result.download.bandwidth,
+          upload: result.upload.bandwidth,
+          ping: result.ping.latency,
+          server: result.server.name,
+          isp: result.isp,
+        };
+        speedtestHistory.push(entry);
+        if (speedtestHistory.length > SPEEDTEST_MAX_HISTORY) speedtestHistory.shift();
+        running = false;
+        return res.json({ ok: true, ...entry });
+      } catch (err) {
+        console.error(`[speedtest] attempt ${attempt + 1}:`, err.message);
+        lastErr = err;
+        if (attempt === 0) await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    running = false;
+    res.status(500).json({ ok: false, error: lastErr.message });
+  });
+
+  app.get('/api/speedtest/history', (req, res) => {
+    res.json({ ok: true, results: speedtestHistory });
+  });
+}
 
 // 404 for undefined /api/* routes – must come before SPA catch-all
 app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));

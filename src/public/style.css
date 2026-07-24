@@ -17,6 +17,7 @@
 }
 
 html { font-size: 15px; }
+.hidden { display: none !important; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -289,10 +290,26 @@ main {
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 
+/* ---- Speed Test ---- */
+.speedtest-controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.speedtest-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
+.speedtest-stat {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+}
+.speedtest-stat-label { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+.speedtest-stat-value { display: block; font-size: 1rem; font-weight: 600; }
+.speedtest-chart-wrap { width: 100%; overflow: hidden; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); padding: 0.5rem; }
+.speedtest-chart-wrap canvas { width: 100%; height: 80px; display: block; }
+
 /* ---- Responsive ---- */
 @media (max-width: 600px) {
   .header-inner { flex-direction: column; align-items: flex-start; }
   .dashboard-group { padding: 1rem 0.75rem; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .banner-actions { flex-direction: column; }
+  .speedtest-stats { grid-template-columns: repeat(2, 1fr); }
 }

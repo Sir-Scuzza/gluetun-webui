@@ -9,6 +9,17 @@ FROM node:26-alpine@sha256:b9b5737eabd423ba73b21fe2e82332c0656d571daf1ebf19b0f89
 WORKDIR /app
 ENV NODE_ENV=production
 
+# gcompat: glibc compat for speedtest binary (Alpine uses musl)
+# speedtest: Ookla CLI for optional speed test feature
+ARG SPEEDTEST_VERSION=1.2.0
+RUN apk add --no-cache gcompat curl && \
+    curl -fsSL -o /tmp/speedtest.tgz \
+      "https://install.speedtest.net/app/cli/ookla-speedtest-${SPEEDTEST_VERSION}-linux-$(uname -m).tgz" && \
+    tar -xzf /tmp/speedtest.tgz -C /usr/local/bin speedtest && \
+    chmod +x /usr/local/bin/speedtest && \
+    rm /tmp/speedtest.tgz && \
+    apk del curl
+
 # Add non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 

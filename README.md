@@ -50,6 +50,7 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 - Start / Stop VPN controls
 - Auto-refresh with configurable interval (5s – 60s)
 - Last 30 poll ticks colour-coded in history bar
+- **Speed Test** — Run Ookla speed tests from the UI, track download/upload/ping over time (opt-in)
 - Responsive design (mobile, tablet, desktop)
 
 ---
@@ -264,6 +265,7 @@ Each instance can have different authentication:
 | `GLUETUN_PASSWORD` | _(empty)_ | **Legacy** – Password for HTTP Basic auth |
 | `PORT` | `3000` | Port the web UI listens on |
 | `TRUST_PROXY` | `false` | Set to `true` if running behind a reverse proxy (nginx, Traefik, etc.) |
+| `SPEEDTEST_ENABLED` | `false` | Enable the speed test card (requires Ookla CLI binary in image) |
 
 ---
 
@@ -322,6 +324,48 @@ labels:
   - "traefik.http.middlewares.auth.basicauth.users=user:$$apr1$$<hash>"
 ```
 Generate a hash with: `htpasswd -nb user password`
+
+---
+
+## Speed Test
+
+An optional speed test feature powered by the Ookla Speedtest CLI. Off by default.
+
+### Enabling
+
+Set `SPEEDTEST_ENABLED=true` in your environment:
+
+```yaml
+gluetun-webui:
+  environment:
+    - SPEEDTEST_ENABLED=true
+```
+
+A "Speed Test" card appears with a **Run Test** button. Each test takes 15–30 seconds and measures download, upload, ping, and server. Results are charted over time (last 20 tests).
+
+### Routing Through VPN
+
+By default, the speed test measures the **webui container's connection**, which is typically the host's direct internet — not the VPN tunnel.
+
+To test your **VPN connection speed**, route the webui's traffic through Gluetun:
+
+```yaml
+gluetun-webui:
+  network_mode: "service:gluetun"   # shares Gluetun's network namespace
+  environment:
+    - GLUETUN_CONTROL_URL=http://localhost:8000  # changes from gluetun:8000
+    - SPEEDTEST_ENABLED=true
+  # Remove 'ports' and 'networks' sections — use Gluetun's ports instead
+```
+
+**Breaking config changes** when switching to `network_mode: "service:gluetun"`:
+- `GLUETUN_CONTROL_URL` must change to `http://localhost:8000`
+- Remove `ports:` from the webui service — expose port 3000 through Gluetun's port mappings instead
+- Remove `networks:` from the webui service
+
+Monitoring, VPN controls, and all other features continue to work normally.
+
+---
 
 ---
 
