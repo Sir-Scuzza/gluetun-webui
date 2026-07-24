@@ -118,7 +118,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2kb' }));
 app.use(uiLimiter, express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
@@ -244,7 +243,6 @@ app.get('/api/dns', async (req, res) => {
   }
 });
 
-// VPN control actions
 const vpnActionLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -253,17 +251,8 @@ const vpnActionLimiter = rateLimit({
   message: { ok: false, error: 'Too many requests, please try again later.' },
 });
 
-// Rate limiting for SPA/static index route
-const staticLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { ok: false, error: 'Too many requests, please try again later.' },
-});
-
 // --- Per-instance VPN control ---
-app.put('/api/:instanceId/vpn/:action', vpnActionLimiter, async (req, res) => {
+app.put('/api/:instanceId/vpn/:action', vpnActionLimiter, express.json({ limit: '2kb' }), async (req, res) => {
   const instance = resolveInstance(req.params.instanceId);
   if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
   const { action } = req.params;
@@ -286,7 +275,7 @@ app.put('/api/:instanceId/vpn/:action', vpnActionLimiter, async (req, res) => {
 });
 
 // --- Legacy VPN control (instance 1) ---
-app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
+app.put('/api/vpn/:action', vpnActionLimiter, express.json({ limit: '2kb' }), async (req, res) => {
   const { action } = req.params;
   const allowed = ['start', 'stop'];
   if (!allowed.includes(action)) {
@@ -309,7 +298,7 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
 // 404 for undefined /api/* routes – must come before SPA catch-all
 app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));
 
-app.get('*', staticLimiter, (req, res) => {
+app.get('/{*splat}', uiLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -320,7 +309,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ ok: false, error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Gluetun Web UI running on port ${PORT}`);
-  instances.forEach(inst => console.log(`  [${inst.id}] ${inst.name} → ${inst.url}`));
-});
+// Only listen when run directly (not when imported for testing)
+if (require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`Gluetun Web UI running on port ${PORT}`);
+    instances.forEach(inst => console.log(`  [${inst.id}] ${inst.name} → ${inst.url}`));
+  });
+
+  function gracefulShutdown(signal) {
+    console.log(`\n[${signal}] Shutting down gracefully…`);
+    server.close(() => { console.log('Server closed.'); process.exit(0); });
+    setTimeout(() => process.exit(1), 5000);
+  }
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+module.exports = { app, parseInstances, gluetunFetch };

@@ -10,8 +10,7 @@ let refreshTimer = null;
 // ---- Utility ----
 
 function $(id) { return document.getElementById(id); }
-function setText(id, val) { const el = $(id); if (el) el.textContent = val ?? '–'; }
-function setEl(id, val)   { const el = document.getElementById(id); if (el) el.textContent = val ?? '–'; }
+function setEl(id, val) { const el = $(id); if (el) el.textContent = val ?? '–'; }
 
 function escHtml(str) {
   return String(str)
@@ -61,7 +60,8 @@ function renderHistoryFor(id) {
 // ---- Dashboard group builder (old layout per instance) ----
 
 function buildDashboardGroup(inst) {
-  const id = inst.id;
+  const id = String(inst.id);
+  if (!/^\d+$/.test(id)) return document.createDocumentFragment();
   const group = document.createElement('div');
   group.className = 'dashboard-group';
   group.id = `dashboard-${id}`;
@@ -74,8 +74,8 @@ function buildDashboardGroup(inst) {
         <span id="i${id}-banner-sub" class="muted"></span>
       </div>
       <div class="banner-actions">
-        <button id="i${id}-btn-start" class="btn-success">&#9654; Start</button>
-        <button id="i${id}-btn-stop" class="btn-danger">&#9209; Stop</button>
+        <button id="i${id}-btn-start" type="button" class="btn-success">&#9654; Start</button>
+        <button id="i${id}-btn-stop" type="button" class="btn-danger">&#9209; Stop</button>
       </div>
     </div>
 
@@ -262,7 +262,12 @@ async function pollAll() {
   if (isPolling) return;
   isPolling = true;
   const refreshBtn = $('refresh-btn');
-  refreshBtn.innerHTML = '<span class="spin">&#x21bb;</span> Refresh';
+  refreshBtn.textContent = '';
+  const spin = document.createElement('span');
+  spin.className = 'spin';
+  spin.textContent = '\u21bb';
+  refreshBtn.appendChild(spin);
+  refreshBtn.appendChild(document.createTextNode(' Refresh'));
   refreshBtn.disabled = true;
 
   await Promise.allSettled(instances.map(async inst => {
@@ -274,8 +279,8 @@ async function pollAll() {
     }
   }));
 
-  setText('last-updated', `Updated ${new Date().toLocaleTimeString()}`);
-  refreshBtn.innerHTML = '&#x21bb; Refresh';
+  setEl('last-updated', `Updated ${new Date().toLocaleTimeString()}`);
+  refreshBtn.textContent = '\u21bb Refresh';
   refreshBtn.disabled = false;
   isPolling = false;
 }
@@ -331,7 +336,8 @@ $('refresh-interval').addEventListener('change', applyAutoRefresh);
   try {
     const res = await fetch('/api/instances');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    instances = await res.json();
+    const data = await res.json();
+    instances = Array.isArray(data) ? data : [{ id: '1', name: 'Gluetun' }];
   } catch (_) {
     instances = [{ id: '1', name: 'Gluetun' }];
   }

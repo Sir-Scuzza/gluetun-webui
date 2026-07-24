@@ -137,22 +137,14 @@ main {
 .status-banner.unknown      .banner-icon { color: var(--muted); }
 
 .banner-text { flex: 1; }
-#banner-title { font-size: 1.05rem; font-weight: 600; display: block; }
-#banner-sub   { font-size: 0.82rem; }
+.banner-text span { display: block; }
+.banner-text .muted { font-size: 0.82rem; }
 
 .banner-actions { display: flex; gap: 0.5rem; }
 .btn-success { border-color: var(--green); color: var(--green); }
 .btn-success:hover { background: rgba(74,222,128,0.15); }
 .btn-danger  { border-color: var(--red); color: var(--red); }
 .btn-danger:hover  { background: rgba(248,113,113,0.15); }
-
-/* ---- Grid ---- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
-.card-wide { grid-column: 1 / -1; }
 
 /* ---- Cards ---- */
 .card {
@@ -172,7 +164,7 @@ main {
   background: var(--surface2);
 }
 .card-icon { font-size: 1.1rem; }
-.card-header h2 { font-size: 0.9rem; font-weight: 600; flex: 1; }
+.card-header h3 { font-size: 0.9rem; font-weight: 600; flex: 1; }
 
 .badge {
   font-size: 0.72rem;
@@ -233,36 +225,6 @@ main {
 .dot.paused       { background: var(--yellow); }
 .dot.disconnected { background: var(--red); }
 .dot.unknown      { background: var(--muted); }
-
-/* ---- Instance tabs ---- */
-.instance-tabs {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: 0.35rem;
-  padding: 0.55rem 1.5rem;
-  max-width: 100%;
-  overflow-x: auto;
-}
-.instance-tabs.hidden { display: none; }
-.tab-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: 0.32rem 0.9rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.tab-btn:hover { background: var(--surface2); color: var(--text); }
-.tab-btn.active {
-  background: rgba(74,222,128,0.12);
-  border-color: var(--green);
-  color: var(--green);
-  font-weight: 600;
-}
 
 /* ---- Toast ---- */
 .toast {

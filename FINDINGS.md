@@ -1,6 +1,6 @@
 # Code Review Findings
 
-> Last reviewed: 2026-03-02 (pass 3)  
+> Last reviewed: 2026-07-24 (pass 5)  
 > Scope: security, correctness, reliability, code quality  
 > Status key: 🔴 High · 🟡 Medium · 🔵 Low · ✅ Fixed
 
@@ -18,33 +18,53 @@ _No open bugs._
 |---|---|---|---|
 | S-05 | 🔵 Low | `src/server.js` | **No `Strict-Transport-Security` (HSTS) header.** Intentionally omitted for plain-HTTP local use. Must be added if the app is ever placed behind an HTTPS reverse proxy. |
 | S-06 | 🔵 Low | `src/server.js` | **Rate limiter uses in-memory store.** Counters reset on every container restart. Acceptable for single-instance home use; note for any production or shared deployment. Also: if `TRUST_PROXY=false` (default) and the app is deployed behind a reverse proxy, `req.ip` collapses to the proxy IP, causing all clients to share one rate-limit bucket. Document that `TRUST_PROXY=true` is required when behind a proxy for per-client rate limiting. |
-| S-08 | 🔵 Low | `src/server.js` | **No graceful shutdown handler.** The process does not handle `SIGTERM`/`SIGINT`. Docker sends `SIGTERM` on `docker stop`; without a handler, in-flight requests are dropped and the process falls back to `SIGKILL` after the timeout. Note: requires storing `app.listen()` result as `const server` first. Add `process.on('SIGTERM', () => server.close())`. |
+| ~~S-08~~ | 🔵 Low | ~~No graceful shutdown handler~~ — Fixed in pass 5 (graceful shutdown with 5s forced-exit) |
 
 ### Code Quality / Correctness
 
 | # | Severity | File | Finding |
 |---|---|---|---|
-| C-03 | 🔵 Low | `package.json` | **Express 4 used; Express 5 is stable.** Express 5 (released Oct 2024) adds native async error propagation, deprecating the manual 4-argument error handler. Non-urgent upgrade candidate. |
-| C-04 | 🔵 Low | All | **No tests.** No unit or integration test suite exists. Highest-value targets: `gluetunFetch` error handling, `updatePanel` state logic, and `updatePanelError` reset paths. |
-| C-05 | 🔵 Low | `src/public/app.js` | **`innerHTML` used for spinner markup.** `refreshBtn.innerHTML = '<span class="spin">…</span> Refresh'` is safe (hardcoded string) but inconsistent with the `textContent`-only approach used everywhere else. Use `document.createElement` for consistency. |
-| C-06 | 🔵 Low | `src/server.js` | **`express.json()` runs on every request.** The body parser is registered globally but only the two `PUT` VPN action routes consume a body. Scope it to those routes to skip unnecessary parsing on GETs. |
-| C-07 | 🔵 Low | `src/public/index.html` | **`instance-tabs` nav element is never populated.** HTML declares `<nav id="instance-tabs">` and CSS styles `.instance-tabs`, but `app.js` never populates or shows this element. Dead UI element — either implement tab switching or remove the element and its CSS. |
-| C-08 | 🔵 Low | `src/public/style.css` | **Dead CSS rules.** `#banner-title` and `#banner-sub` selectors target non-existent IDs (dynamic IDs are `i{N}-banner-title` / `i{N}-banner-sub`). `.card-header h2` styles `h2` but the generated markup uses `<h3>`. `.grid` class is defined but never used (actual layout uses `.dashboard-grid`). |
-| C-09 | 🔵 Low | `src/public/app.js` | **Duplicate utility functions.** `$(id)` and `setText(id, val)` overlap with `setEl(id, val)` — all resolve an element by ID and set `textContent`. `setText` is used only once (for `last-updated`). Consolidate into a single helper. |
-| C-10 | 🔵 Low | `src/server.js` | **Redundant / confusing rate limiters for static content.** `uiLimiter` (1000/hour) covers `express.static()` and `staticLimiter` (120/min) covers the SPA catch-all — both serve `index.html` but with different thresholds. Consolidate into one limiter or document the intentional difference. |
-| C-11 | 🔵 Low | `src/public/app.js` | **`buildDashboardGroup` injects `id` into `innerHTML` without escaping.** `inst.name` is correctly escaped via `escHtml()`, but `id` (e.g. `i${id}-banner`) is interpolated raw. Currently safe because `id` is always a numeric string from `parseInstances`, but not defensively coded. Escape or validate `id` for completeness. |
-| C-12 | 🔵 Low | `src/public/app.js` | **No type-check on `/api/instances` response.** If the server returns a non-array 200 response, `instances` is set to a non-iterable value. `renderAllDashboards()` then throws on `instances.forEach()`. Add `Array.isArray()` guard before assignment. |
-| N-03 | 🔵 Low | `src/public/index.html` | **`<button>` elements missing `type="button"` attribute.** `#refresh-btn` in HTML and dynamically created `#btn-start`/`#btn-stop` in `app.js` omit the type attribute. The HTML spec defaults `<button>` to `type="submit"`. Explicitly set `type="button"` on each. |
+| ~~C-03~~ | 🔵 Low | ~~Express 4 used; Express 5 is stable~~ — Fixed in pass 5 (upgraded to Express 5) |
+| ~~C-04~~ | 🔵 Low | ~~No tests~~ — Fixed in pass 5 (vitest + supertest, 8 tests) |
+| ~~C-05~~ | 🔵 Low | ~~`innerHTML` used for spinner markup~~ — Fixed in pass 5 (replaced with `createElement`) |
+| ~~C-06~~ | 🔵 Low | ~~`express.json()` runs on every request~~ — Fixed in pass 5 (scoped to PUT routes) |
+| ~~C-07~~ | 🔵 Low | ~~`instance-tabs` nav never populated~~ — Fixed in pass 5 (removed dead element + CSS) |
+| ~~C-08~~ | 🔵 Low | ~~Dead CSS rules~~ — Fixed in pass 5 (removed `#banner-title`, `#banner-sub`, `.grid`, `.instance-tabs`; fixed h2→h3) |
+| ~~C-09~~ | 🔵 Low | ~~Duplicate utility functions~~ — Fixed in pass 5 (consolidated into `setEl`) |
+| ~~C-10~~ | 🔵 Low | ~~Redundant rate limiters~~ — Fixed in pass 5 (consolidated into single `uiLimiter`) |
+| ~~C-11~~ | 🔵 Low | ~~`buildDashboardGroup` injects `id` without escaping~~ — Fixed in pass 5 (added numeric regex validation) |
+| ~~C-12~~ | 🔵 Low | ~~No type-check on `/api/instances` response~~ — Fixed in pass 5 (added `Array.isArray()` guard) |
+| ~~N-03~~ | 🔵 Low | ~~`<button>` elements missing `type="button"`~~ — Fixed in pass 5 (added `type="button"` everywhere) |
 
 ### Infrastructure / Docker
 
 | # | Severity | File | Finding |
 |---|---|---|---|
-| D-01 | 🔵 Low | `docker-compose.example.yml` | **No resource limits.** No `mem_limit`, `cpus`, or `pids_limit` defined. Add `deploy.resources.limits` or compose v2 resource keys to prevent resource exhaustion. |
+| ~~D-01~~ | 🔵 Low | ~~No resource limits~~ — Fixed in pass 5 (added `deploy.resources.limits`: 128M memory, 0.50 CPUs) |
 
 ---
 
-## Fixed Findings (resolved in this review cycle)
+## Fixed Findings (pass 5 — 2026-07-24)
+
+| # | Severity | Finding |
+|---|---|---|
+| S-08 | 🔵 Low | Graceful shutdown: added `SIGTERM`/`SIGINT` handlers with 5s forced-exit timer |
+| C-03 | 🔵 Low | Upgraded Express 4 → 5 (native async error propagation, wildcard route `/{*splat}`) |
+| C-04 | 🔵 Low | Added test suite: vitest + supertest, 8 tests covering routes |
+| C-05 | 🔵 Low | Replaced `innerHTML` spinner with `document.createElement` |
+| C-06 | 🔵 Low | Scoped `express.json()` to PUT routes only |
+| C-07 | 🔵 Low | Removed dead `instance-tabs` nav element and CSS |
+| C-08 | 🔵 Low | Removed dead CSS (`#banner-title`, `#banner-sub`, `.grid`, `.instance-tabs`). Fixed `.card-header h2` → `.card-header h3` |
+| C-09 | 🔵 Low | Consolidated `$(id)`/`setText(id,val)` into single `setEl` utility |
+| C-10 | 🔵 Low | Consolidated `staticLimiter`/`uiLimiter` into single `uiLimiter` |
+| C-11 | 🔵 Low | `buildDashboardGroup` id validated with `/^\d+$/` regex before innerHTML interpolation |
+| C-12 | 🔵 Low | Added `Array.isArray()` guard on `/api/instances` response |
+| N-03 | 🔵 Low | Added `type="button"` to all `<button>` elements (HTML and dynamic JS) |
+| D-01 | 🔵 Low | Added `deploy.resources.limits` (128M memory, 0.50 CPUs) to all docker-compose examples |
+
+---
+
+## Fixed Findings (resolved in previous review cycles)
 
 <details>
 <summary>Click to expand — 39 issues resolved</summary>
@@ -97,16 +117,11 @@ _No open bugs._
 
 ## Recommended Next Steps (priority order)
 
-1. **S-08** — Store `app.listen()` as `const server`, then add graceful shutdown handler
-2. **C-08** — Remove dead CSS rules (`#banner-title`, `#banner-sub`, `.card-header h2`, `.grid`)
-3. **C-07** — Remove unused `instance-tabs` nav or implement tab switching
-4. **C-10** — Consolidate `staticLimiter` and `uiLimiter` into a single static content limiter
-5. **C-09** — Consolidate `$`/`setText`/`setEl` into one utility function
-6. **C-06** — Scope `express.json()` to PUT routes only
-7. **N-03** — Add `type="button"` to all `<button>` elements
-8. **C-12** — Add `Array.isArray()` guard on `/api/instances` response
-9. **C-04** — Add tests for `gluetunFetch`, `updatePanel`, and `updatePanelError`
-10. **C-05** — Replace `innerHTML` spinner with `createElement`
+_No remaining findings._ All original open findings are now fixed or documented as intentional.
+
+**Intentionally open:**
+- **S-05** — HSTS omitted for plain-HTTP local use. Add if behind HTTPS reverse proxy.
+- **S-06** — In-memory rate limiter resets on restart. Acceptable for single-instance home use.
 11. **D-01** — Add container resource limits to `docker-compose.yml`
 12. **C-03** — Plan Express 5 migration (review changelog for breaking changes first)
 
