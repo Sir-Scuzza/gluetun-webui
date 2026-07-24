@@ -68,6 +68,7 @@ button {
   transition: background 0.15s, border-color 0.15s;
 }
 button:hover { background: var(--border); }
+#edit-toggle.active { background: rgba(74,222,128,0.15); border-color: var(--green); color: var(--green); }
 
 .auto-refresh-label {
   display: flex;
@@ -296,3 +297,51 @@ main {
   .dashboard-grid { grid-template-columns: 1fr; }
   .banner-actions { flex-direction: column; }
 }
+
+/* ---- Edit mode ---- */
+.dashboard-grid .card.dragging { opacity: 0.4; border-style: dashed; }
+.dashboard-grid .card.drag-over { border-color: var(--green); box-shadow: 0 0 0 2px rgba(74,222,128,0.3); }
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 2;
+}
+.resize-handle:hover { background: rgba(74,222,128,0.15); }
+.card { position: relative; }
+.visibility-panel {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.vis-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.vis-toggle input[type="checkbox"] {
+  accent-color: var(--green);
+}
+.reset-layout-btn {
+  margin-left: auto;
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+}
+.reset-layout-btn:hover { background: rgba(248,113,113,0.1); }
+.card.resizing { outline: 2px solid var(--green); outline-offset: -1px; opacity: 0.85; }
+.grid-overlay { position: absolute; top: 0; pointer-events: none; z-index: 10; }
