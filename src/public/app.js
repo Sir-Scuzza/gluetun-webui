@@ -2,10 +2,12 @@
 
 const MAX_HISTORY = 30;
 const VALID_STATES = new Set(['connected', 'paused', 'disconnected', 'unknown']);
+const AIRVPN_SERVERS = ["Achernar", "Achird", "Adhara", "Adhil", "Agena", "Ainalrami", "Aladfar", "Alamak", "Albaldah", "Albali", "Alchiba", "Alcyone", "Alderamin", "Algorab", "Alhena", "Aljanah", "Alkurhah", "Alnitak", "Alphard", "Alphecca", "Alpheratz", "Alphirk", "Alrai", "Alrami", "Alruba", "Alsephina", "Alshat", "Alterf", "Aludra", "Alula", "Alwaid", "Alya", "Alzirr", "Amansinaya", "Ancha", "Andromeda", "Angetenar", "Anser", "Apus", "Aquila", "Arber", "Arkab", "Ascella", "Asellus", "Ashlesha", "Aspidiske", "Athebyne", "Atik", "Atria", "Auriga", "Avior", "Azelfafage", "Azmidiske", "Baiduri", "Baiten", "Beemim", "Benetnasch", "Bharani", "Biham", "Bubup", "Bunda", "Caelum", "Camelopardalis", "Canes", "Canis", "Capella", "Caph", "Capricornus", "Castor", "Castula", "Ceibo", "Celaeno", "Centaurus", "Cephei", "Cepheus", "Cervantes", "Chamaeleon", "Chamukuy", "Chaophraya", "Chara", "Chertan", "Chort", "Circinus", "Columba", "Comae", "Copernicus", "Crater", "Cujam", "Cygnus", "Dalim", "Delphinus", "Diadema", "Diphda", "Dorado", "Dubhe", "Dziban", "Edasich", "Elgafar", "Elkurud", "Elnath", "Eltanin", "Enif", "Equuleus", "Eridanus", "Errai", "Fang", "Fawaris", "Felis", "Fleed", "Fomalhaut", "Fulu", "Fuyue", "Garnet", "Gemini", "Gianfar", "Giausar", "Gienah", "Ginan", "Gorgonea", "Grus", "Guniibuu", "Hamal", "Hassaleh", "Helvetios", "Hercules", "Horologium", "Hyadum", "Hydra", "Hydrus", "Imai", "Iskandar", "Jabbah", "Jishui", "Kajam", "Khambalia", "Kocab", "Kornephoros", "Kruger", "Lacerta", "Larawag", "Leo", "Lesath", "Libra", "Luhman", "Lupus", "Luyten", "Maasym", "Maia", "Markab", "Marsic", "Matar", "Mebsuta", "Meissa", "Mekbuda", "Meleph", "Melnick", "Menkab", "Menkalinan", "Menkent", "Mensa", "Merga", "Meridiana", "Minchir", "Mintaka", "Mirach", "Miram", "Mirfak", "Mirzam", "Mothallah", "Muhlifain", "Muliphein", "Muphrid", "Musca", "Muscida", "Musica", "Nahn", "Nash", "Nembus", "Norma", "Ogma", "Okab", "Ophiuchus", "Orion", "Paikauhale", "Pegasus", "Phact", "Phaet", "Piautos", "Pisces", "Piscium", "Pleione", "Polis", "Praecipua", "Pyxis", "Ran", "Regulus", "Revati", "Ross", "Rotanev", "Rukbat", "Sadachbia", "Sadalbari", "Sadalmelik", "Sadalsuud", "Sadr", "Saiph", "Salm", "Sargas", "Sarin", "Schedir", "Sculptor", "Scuti", "Scutum", "Segin", "Sham", "Sharatan", "Sheliak", "Sheratan", "Sirrah", "Situla", "Sneden", "Sualocin", "Subra", "Suhail", "Sulafat", "Superba", "Taiyangshou", "Taiyi", "Talitha", "Taphao", "Tarazed", "Taurus", "Tegmen", "Tejat", "Telescopium", "Terebellum", "Theemin", "Tiaki", "Tianguan", "Tianyi", "Titawin", "Toliman", "Torcular", "Triangulum", "Turais", "Tyl", "Ukdah", "Unukalhai", "Unurgunite", "Ursa", "Vindemiatrix", "Volans", "Vulpecula", "Xamidimura", "Zibal"];
 
 let instances    = [];   // [{ id, name }] from /api/instances
 let isPolling    = false;
 let refreshTimer = null;
+const instanceSettings = new Map(); // id -> settings object (from /api/:instanceId/health vpnSettings.data)
 
 // ---- Utility ----
 
@@ -94,21 +96,21 @@ function buildDashboardGroup(inst) {
         </div>
       </div>
 
-      <!-- VPN details card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-icon">&#128274;</span>
-          <h3>VPN Connection</h3>
-        </div>
-        <div class="card-body">
-          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i${id}-vpn-status">–</span></div>
-          <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i${id}-vpn-provider">–</span></div>
-          <div class="stat-row"><span class="stat-label">Server</span><span class="stat-value mono" id="i${id}-vpn-server">–</span></div>
-          <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i${id}-vpn-protocol">–</span></div>
-          <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i${id}-vpn-country">–</span></div>
-          <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i${id}-vpn-city">–</span></div>
-        </div>
-      </div>
+<!-- VPN details card -->
+       <div class="card">
+         <div class="card-header">
+           <span class="card-icon">&#128274;</span>
+           <h3>VPN Connection</h3>
+         </div>
+         <div class="card-body">
+           <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value" id="i${id}-vpn-status">–</span></div>
+           <div class="stat-row"><span class="stat-label">Provider</span><span class="stat-value" id="i${id}-vpn-provider">–</span></div>
+           <div class="stat-row"><span class="stat-label">Server</span><div id="i${id}-server-container" class="server-input-container"><select id="i${id}-server-select" class="server-select"><option value="">Auto (best)</option></select></div></div>
+           <div class="stat-row"><span class="stat-label">Protocol</span><span class="stat-value" id="i${id}-vpn-protocol">–</span></div>
+           <div class="stat-row"><span class="stat-label">Country</span><span class="stat-value" id="i${id}-vpn-country">–</span></div>
+           <div class="stat-row"><span class="stat-label">City</span><span class="stat-value" id="i${id}-vpn-city">–</span></div>
+         </div>
+       </div>
 
       <!-- Port forwarding card -->
       <div class="card">
@@ -150,9 +152,14 @@ function buildDashboardGroup(inst) {
       </div>
     </div>
   `;
-  group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
-  group.querySelector(`#i${id}-btn-stop`).addEventListener('click', () => vpnAction(id, 'stop'));
-  return group;
+group.querySelector(`#i${id}-btn-start`).addEventListener('click', () => vpnAction(id, 'start'));
+   group.querySelector(`#i${id}-btn-stop`).addEventListener('click', () => vpnAction(id, 'stop'));
+    const serverSelect = group.querySelector(`#i${id}-server-select`);
+    serverSelect.addEventListener('change', () => {
+         const selected = serverSelect.value;
+         updateServerForInstance(id, selected);
+    });
+   return group;
 }
 
 function renderAllDashboards() {
@@ -220,32 +227,61 @@ function updatePanel(inst, health) {
   const port = portForwarded?.ok ? (portForwarded.data?.port ?? 0) : 0;
   setEl(`i${id}-port-number`, port > 0 ? String(port) : portForwarded?.ok ? 'Not forwarded' : 'N/A');
 
-  setEl(`i${id}-dns-status`, dnsStatus?.ok ? (dnsStatus.data?.status ?? 'OK') : 'Unavailable');
+setEl(`i${id}-dns-status`, dnsStatus?.ok ? (dnsStatus.data?.status ?? 'OK') : 'Unavailable');
 
-  pushHistoryFor(id, state);
-  renderHistoryFor(id);
+   // Store the VPN settings for later use in server changes
+   if (s) {
+       instanceSettings.set(id, s);
+       const select = document.getElementById(`i${id}-server-select`);
+       if (select) {
+           const provider = s?.provider?.name ?? '';
+           if (provider === 'airvpn') {
+               if (select.options.length <= 1) {
+                   AIRVPN_SERVERS.forEach(name => {
+                       const opt = document.createElement('option');
+                       opt.value = name;
+                       opt.textContent = name;
+                       select.appendChild(opt);
+                   });
+               }
+               select.disabled = false;
+               const serverName = s?.provider?.server_selection?.names?.[0] ?? '';
+               select.value = serverName;
+           } else {
+               select.innerHTML = '<option value="">Auto (best)</option>';
+               select.disabled = true;
+           }
+       }
+   } else {
+       instanceSettings.delete(id);
+   }
+
+   pushHistoryFor(id, state);
+   renderHistoryFor(id);
 }
 
 function updatePanelError(inst) {
-  const id = inst.id;
-  const banner = document.getElementById(`i${id}-banner`);
-  if (banner) banner.className = 'status-banner unknown';
-  setEl(`i${id}-banner-title`, 'Status Unknown');
-  setEl(`i${id}-banner-sub`, 'Could not reach Gluetun control API');
-  setEl(`i${id}-ip-address`, '–');
-  setEl(`i${id}-ip-country`, '–');
-  setEl(`i${id}-ip-city`, '–');
-  setEl(`i${id}-ip-org`, '–');
-  setEl(`i${id}-vpn-status`, '–');
-  setEl(`i${id}-vpn-provider`, '–');
-  setEl(`i${id}-vpn-server`, '–');
-  setEl(`i${id}-vpn-protocol`, '–');
-  setEl(`i${id}-vpn-country`, '–');
-  setEl(`i${id}-vpn-city`, '–');
-  setEl(`i${id}-port-number`, 'N/A');
-  setEl(`i${id}-dns-status`, 'Unavailable');
-  pushHistoryFor(id, 'unknown');
-  renderHistoryFor(id);
+   const id = inst.id;
+   const banner = document.getElementById(`i${id}-banner`);
+   if (banner) banner.className = 'status-banner unknown';
+   setEl(`i${id}-banner-title`, 'Status Unknown');
+   setEl(`i${id}-banner-sub`, 'Could not reach Gluetun control API');
+   setEl(`i${id}-ip-address`, '–');
+   setEl(`i${id}-ip-country`, '–');
+   setEl(`i${id}-ip-city`, '–');
+   setEl(`i${id}-ip-org`, '–');
+   setEl(`i${id}-vpn-status`, '–');
+   setEl(`i${id}-vpn-provider`, '–');
+   setEl(`i${id}-vpn-server`, '–');
+   setEl(`i${id}-vpn-protocol`, '–');
+   setEl(`i${id}-vpn-country`, '–');
+   setEl(`i${id}-vpn-city`, '–');
+   setEl(`i${id}-port-number`, 'N/A');
+   setEl(`i${id}-dns-status`, 'Unavailable');
+   pushHistoryFor(id, 'unknown');
+   renderHistoryFor(id);
+   // Remove stored settings for this instance on error to avoid stale data
+   instanceSettings.delete(id);
 }
 
 // ---- API ----
@@ -327,7 +363,45 @@ $('refresh-btn').addEventListener('click', () => {
 });
 $('refresh-interval').addEventListener('change', applyAutoRefresh);
 
-(async () => {
+async function updateServerForInstance(instanceId, newServer) {
+    const s = instanceSettings.get(instanceId);
+    if (!s) {
+        showToast('Instance settings not loaded yet. Wait for first poll.', 'error');
+        return;
+    }
+    const prov = s?.provider;
+    if (!prov) {
+        showToast('Provider settings not found', 'error');
+        return;
+    }
+    const ss = prov.server_selection;
+    const updatedSettings = {
+        ...s,
+        provider: {
+            ...prov,
+            server_selection: {
+                ...ss,
+                names: newServer ? [newServer] : null,
+                hostnames: null
+            }
+        }
+    };
+    // ponytail: full settings object sent, Gluetun only picks what changed
+    try {
+        const res = await fetch(`/api/${instanceId}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedSettings)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast(newServer ? `Switching to ${newServer}…` : 'Auto-selecting best server…', 'success');
+    } catch (err) {
+        console.error('[updateServer]', err.message);
+        showToast(`Failed: ${err.message}`, 'error');
+    }
+}
+
+   (async () => {
   try {
     const res = await fetch('/api/instances');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

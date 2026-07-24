@@ -118,13 +118,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2kb' }));
+app.use(express.json({ limit: '2mb' }));
 app.use(uiLimiter, express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
   const url = `${instance.url}${endpoint}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const ms = method === 'PUT' ? 60000 : 5000;
+  const timeoutId = setTimeout(() => controller.abort(), ms);
   const opts = {
     method,
     signal: controller.signal,
@@ -141,7 +142,8 @@ async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
       const text = await res.text().catch(() => '');
       throw new Error(`Gluetun returned ${res.status}${text ? ': ' + text.slice(0, 200).trim() : ''}`);
     }
-    return res.json();
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return text; }
   } finally {
     clearTimeout(timeoutId);
   }
@@ -227,6 +229,35 @@ app.get('/api/portforwarded', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
   try {
     const data = await gluetunFetch(instances[0], '/v1/vpn/settings');
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+app.get('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(instance, '/v1/vpn/settings');
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+app.put('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(
+      instance,
+      '/v1/vpn/settings',
+      'PUT',
+      req.body
+    );
     res.json({ ok: true, data });
   } catch (err) {
     console.error('[upstream]', err.message);
