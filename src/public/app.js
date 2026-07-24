@@ -319,6 +319,35 @@ function applyAutoRefresh() {
   scheduleNextPoll();
 }
 
+// ---- Theme ----
+
+const THEMES = ['dark', 'light', 'auto'];
+const THEME_ICONS = { dark: '&#9790;', light: '&#9728;', auto: '&#9681;' };
+let currentTheme = 'dark';
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  if (theme === 'auto') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  const btn = $('theme-toggle');
+  if (btn) btn.innerHTML = THEME_ICONS[theme];
+}
+
+function cycleTheme() {
+  const idx = THEMES.indexOf(currentTheme);
+  const next = THEMES[(idx + 1) % THEMES.length];
+  localStorage.setItem('gluetun_theme', next);
+  applyTheme(next);
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (currentTheme === 'auto') applyTheme('auto');
+});
+
 // ---- Init ----
 
 $('refresh-btn').addEventListener('click', () => {
@@ -326,6 +355,10 @@ $('refresh-btn').addEventListener('click', () => {
   pollAll().then(() => scheduleNextPoll());
 });
 $('refresh-interval').addEventListener('change', applyAutoRefresh);
+$('theme-toggle').addEventListener('click', cycleTheme);
+
+// Load saved theme
+applyTheme(localStorage.getItem('gluetun_theme') || 'dark');
 
 (async () => {
   try {

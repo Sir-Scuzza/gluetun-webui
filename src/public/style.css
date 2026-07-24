@@ -15,6 +15,15 @@
   --radius: 12px;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
+[data-theme="light"] {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #94a3b8;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
 
 html { font-size: 15px; }
 body {
@@ -68,6 +77,7 @@ button {
   transition: background 0.15s, border-color 0.15s;
 }
 button:hover { background: var(--border); }
+#theme-toggle { font-size: 1.1rem; line-height: 1; width: 2.2rem; display: flex; align-items: center; justify-content: center; }
 
 .auto-refresh-label {
   display: flex;
